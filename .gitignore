@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.production
+.env.*.local
+api/.env
+*.log
+.DS_Store
+coverage/
+.turbo/
+prisma/migrations/
+api/prisma/migrations/
+server/node_modules/
+api/node_modules/
+.fundedpro/

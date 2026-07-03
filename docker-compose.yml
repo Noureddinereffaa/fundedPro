@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: fundedpro-postgres
+    environment:
+      POSTGRES_DB: fundedpro
+      POSTGRES_USER: fundedpro
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-fundedpro123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fundedpro -d fundedpro"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: fundedpro-api
+    environment:
+      DATABASE_URL: postgresql://fundedpro:${DB_PASSWORD:-fundedpro123}@postgres:5432/fundedpro?schema=public
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-your-super-secret-refresh-key-change-in-production}
+      JWT_EXPIRES_IN: 24h
+      JWT_REFRESH_EXPIRES_IN: 7d
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      CLIENT_URL: ${CLIENT_URL:-http://localhost}
+      API_URL: http://localhost:3001
+      PORT: 3001
+      NODE_ENV: production
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # WebSocket Data Server
+  ws-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.ws
+    container_name: fundedpro-ws
+    environment:
+      PORT: 3002
+      NODE_ENV: production
+    ports:
+      - "3002:3002"
+    restart: unless-stopped
+
+  # Frontend (Vite dev server for development, or Nginx for production)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: fundedpro-frontend
+    environment:
+      VITE_API_URL: http://localhost:3001/api
+      VITE_WS_URL: ws://localhost:3002
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./index.html:/app/index.html
+      - ./vite.config.ts:/app/vite.config.ts
+    depends_on:
+      - api
+      - ws-server
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy (Production)
+  nginx:
+    image: nginx:alpine
+    container_name: fundedpro-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+      - frontend
+      - ws-server
+    restart: unless-stopped
+    profiles:
+      - production
+
+volumes:
+  postgres_data:

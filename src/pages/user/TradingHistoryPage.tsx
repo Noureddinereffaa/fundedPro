@@ -1,0 +1,245 @@
+import { useState, useEffect } from 'react'
+import { useAuth } from '../../contexts/AuthContext.tsx'
+import { tradingApi, accountApi } from '../../utils/api.ts'
+import Layout from '../../components/Layout.tsx'
+
+interface Trade {
+  id: string
+  symbol: string
+  side: string
+  volume: number
+  openPrice: number
+  closePrice: number
+  profit: number
+  swap: number
+  commission: number
+  duration: number
+  openTime: string
+  closeTime: string
+  closeReason: string
+}
+
+export default function TradingHistoryPage() {
+  const { user, loading: authLoading } = useAuth()
+  const [accounts, setAccounts] = useState<any[]>([])
+  const [selectedAccount, setSelectedAccount] = useState<string>('')
+  const [trades, setTrades] = useState<Trade[]>([])
+  const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [filters, setFilters] = useState({
+    symbol: '',
+    side: '',
+    dateFrom: '',
+    dateTo: '',
+    profit: '',
+  })
+  const totalPages = 1
+
+  useEffect(() => {
+    if (user) {
+      accountApi.getAll().then(data => {
+        const userAccounts = data.accounts || []
+        setAccounts(userAccounts)
+        if (userAccounts.length > 0) {
+          setSelectedAccount(userAccounts[0].id)
+          loadTrades()
+        }
+      }).catch(() => {})
+    }
+  }, [user])
+
+  const loadTrades = () => {
+    if (!selectedAccount) return
+    setLoading(true)
+    tradingApi.getHistory(selectedAccount, page, 50).then(data => {
+      setTrades(data.trades || [])
+      // setTotalPages(Math.ceil((data.total || 0) / 50))
+    }).catch(() => {}).finally(() => setLoading(false))
+  }
+
+  const getFilteredTrades = () => {
+    return trades.filter(t => {
+      if (filters.symbol && t.symbol !== filters.symbol) return false
+      if (filters.side && t.side !== filters.side) return false
+      if (filters.profit === 'win' && Number(t.profit) <= 0) return false
+      if (filters.profit === 'loss' && Number(t.profit) >= 0) return false
+      if (filters.dateFrom && new Date(t.closeTime) < new Date(filters.dateFrom)) return false
+      if (filters.dateTo && new Date(t.closeTime) > new Date(filters.dateTo + 'T23:59:59')) return false
+      return true
+    })
+  }
+
+  if (authLoading) return <Layout><div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading...</div></Layout>
+
+  const filteredTrades = getFilteredTrades()
+  const totalPnl = filteredTrades.reduce((sum, t) => sum + Number(t.profit), 0)
+  const wins = filteredTrades.filter(t => Number(t.profit) > 0).length
+  const losses = filteredTrades.filter(t => Number(t.profit) < 0).length
+
+  return (
+    <Layout>
+      <div style={{ maxWidth: 1200 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e0e0e0', margin: 0 }}>Trading History</h1>
+            <p style={{ color: '#6b7280', margin: '4px 0 0' }}>All your closed trades</p>
+          </div>
+        </div>
+
+        {accounts.length > 0 && (
+          <div style={{ background: '#111827', borderRadius: 12, padding: 16, border: '1px solid #1f2937', marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'end' }}>
+              <div style={{ flex: 1, minWidth: 180 }}>
+                <label style={{ display: 'block', color: '#6b7280', fontSize: 12, marginBottom: 4 }}>Account</label>
+                <select value={selectedAccount} onChange={e => { setSelectedAccount(e.target.value); setPage(1); loadTrades() }} style={{
+                  width: '100%', padding: '8px 12px', background: '#1f2937', border: '1px solid #374151',
+                  borderRadius: 6, color: '#e0e0e0', fontSize: 13,
+                }}>
+                  {accounts.map(a => (
+                    <option key={a.id} value={a.id}>
+                      ${a.accountSize.toLocaleString()} - {a.phase || a.status}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ minWidth: 140 }}>
+                <label style={{ display: 'block', color: '#6b7280', fontSize: 12, marginBottom: 4 }}>Symbol</label>
+                <select value={filters.symbol} onChange={e => setFilters(prev => ({ ...prev, symbol: e.target.value }))} style={{
+                  width: '100%', padding: '8px 12px', background: '#1f2937', border: '1px solid #374151',
+                  borderRadius: 6, color: '#e0e0e0', fontSize: 13,
+                }}>
+                  <option value="">All Symbols</option>
+                  {['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD', 'BTCUSD', 'ETHUSD', 'US30', 'NAS100', 'SPX500'].map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ minWidth: 100 }}>
+                <label style={{ display: 'block', color: '#6b7280', fontSize: 12, marginBottom: 4 }}>Side</label>
+                <select value={filters.side} onChange={e => setFilters(prev => ({ ...prev, side: e.target.value }))} style={{
+                  width: '100%', padding: '8px 12px', background: '#1f2937', border: '1px solid #374151',
+                  borderRadius: 6, color: '#e0e0e0', fontSize: 13,
+                }}>
+                  <option value="">All</option>
+                  <option value="buy">Buy</option>
+                  <option value="sell">Sell</option>
+                </select>
+              </div>
+
+              <div style={{ minWidth: 100 }}>
+                <label style={{ display: 'block', color: '#6b7280', fontSize: 12, marginBottom: 4 }}>Result</label>
+                <select value={filters.profit} onChange={e => setFilters(prev => ({ ...prev, profit: e.target.value }))} style={{
+                  width: '100%', padding: '8px 12px', background: '#1f2937', border: '1px solid #374151',
+                  borderRadius: 6, color: '#e0e0e0', fontSize: 13,
+                }}>
+                  <option value="">All</option>
+                  <option value="win">Wins</option>
+                  <option value="loss">Losses</option>
+                </select>
+              </div>
+
+              <div style={{ minWidth: 140 }}>
+                <label style={{ display: 'block', color: '#6b7280', fontSize: 12, marginBottom: 4 }}>Date From</label>
+                <input type="date" value={filters.dateFrom} onChange={e => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))} style={{
+                  width: '100%', padding: '8px 12px', background: '#1f2937', border: '1px solid #374151',
+                  borderRadius: 6, color: '#e0e0e0', fontSize: 13,
+                }} />
+              </div>
+
+              <div style={{ minWidth: 140 }}>
+                <label style={{ display: 'block', color: '#6b7280', fontSize: 12, marginBottom: 4 }}>Date To</label>
+                <input type="date" value={filters.dateTo} onChange={e => setFilters(prev => ({ ...prev, dateTo: e.target.value }))} style={{
+                  width: '100%', padding: '8px 12px', background: '#1f2937', border: '1px solid #374151',
+                  borderRadius: 6, color: '#e0e0e0', fontSize: 13,
+                }} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+          <StatCard label="Total Trades" value={filteredTrades.length} color="#3b82f6" />
+          <StatCard label="Wins" value={wins} color="#22c55e" />
+          <StatCard label="Losses" value={losses} color="#ef4444" />
+          <StatCard label="Net P&L" value={`${totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)}`} color={totalPnl >= 0 ? '#22c55e' : '#ef4444'} />
+        </div>
+
+        <div style={{ background: '#111827', borderRadius: 12, border: '1px solid #1f2937', overflow: 'hidden' }}>
+          {loading ? (
+            <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading trades...</div>
+          ) : filteredTrades.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>No trades found</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: '#0a0e17' }}>
+                  <th style={th}>Date</th>
+                  <th style={th}>Symbol</th>
+                  <th style={th}>Side</th>
+                  <th style={th}>Volume</th>
+                  <th style={th}>Open</th>
+                  <th style={th}>Close</th>
+                  <th style={th}>P&L</th>
+                  <th style={th}>Swap</th>
+                  <th style={th}>Comm</th>
+                  <th style={th}>Duration</th>
+                  <th style={th}>Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTrades.map(t => (
+                  <tr key={t.id} style={{ borderTop: '1px solid #1f2937' }}>
+                    <td style={td}>{new Date(t.closeTime).toLocaleString()}</td>
+                    <td style={td}>{t.symbol}</td>
+                    <td style={{ ...td, color: t.side === 'buy' ? '#22c55e' : '#ef4444' }}>{t.side.toUpperCase()}</td>
+                    <td style={td}>{t.volume}</td>
+                    <td style={td}>{t.openPrice}</td>
+                    <td style={td}>{t.closePrice}</td>
+                    <td style={{ ...td, fontWeight: 600, color: Number(t.profit) >= 0 ? '#22c55e' : '#ef4444' }}>
+                      ${Number(t.profit).toFixed(2)}
+                    </td>
+                    <td style={td}>${Number(t.swap).toFixed(2)}</td>
+                    <td style={td}>${Number(t.commission).toFixed(2)}</td>
+                    <td style={td}>{formatDuration(t.duration)}</td>
+                    <td style={{ ...td, color: '#6b7280', fontSize: 12 }}>{t.closeReason || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 20 }}>
+            <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} style={pageBtn}>Previous</button>
+            <span style={{ padding: '8px 16px', color: '#6b7280', fontSize: 13 }}>Page {page} of {totalPages}</span>
+            <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} style={pageBtn}>Next</button>
+          </div>
+        )}
+      </div>
+    </Layout>
+  )
+}
+
+function StatCard({ label, value, color }: { label: string; value: any; color: string }) {
+  return (
+    <div style={{ background: '#111827', borderRadius: 8, padding: '16px 20', border: '1px solid #1f2937' }}>
+      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 700, color }}>{value}</div>
+    </div>
+  )
+}
+
+function formatDuration(seconds: number | undefined) {
+  if (!seconds) return '-'
+  if (seconds < 60) return `${seconds}s`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`
+  return `${Math.floor(seconds / 86400)}d ${Math.floor((seconds % 86400) / 3600)}h`
+}
+
+const th: React.CSSProperties = { padding: '12px 14px', textAlign: 'left', color: '#6b7280', fontWeight: 500, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }
+const td: React.CSSProperties = { padding: '10px 14px', color: '#e0e0e0' }
+const pageBtn: React.CSSProperties = { padding: '8px 16px', background: '#1f2937', border: '1px solid #374151', borderRadius: 6, color: '#9ca3af', fontSize: 13, cursor: 'pointer' }

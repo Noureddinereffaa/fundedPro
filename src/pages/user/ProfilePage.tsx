@@ -1,0 +1,190 @@
+import { useState, useEffect } from 'react'
+import { useAuth } from '../../contexts/AuthContext.tsx'
+import { authApi } from '../../utils/api.ts'
+import Layout from '../../components/Layout.tsx'
+import { useToast } from '../../contexts/ToastContext.tsx'
+
+export default function ProfilePage() {
+  const { user, logout } = useAuth()
+  const { addToast } = useToast()
+  const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', country: '' })
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' })
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'account'>('profile')
+
+  useEffect(() => {
+    if (user) {
+      authApi.getProfile()
+        .then(profile => {
+          setForm({
+            firstName: profile.firstName || '',
+            lastName: profile.lastName || '',
+            phone: profile.phone || '',
+            country: profile.country || '',
+          })
+        })
+        .catch(err => {
+          // Fallback if API fails
+          setForm({
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            phone: '',
+            country: '',
+          })
+          console.error(err)
+        })
+        .finally(() => setLoading(false))
+    } else {
+      setLoading(false)
+    }
+  }, [user])
+
+  const update = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }))
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await authApi.updateProfile(form)
+      addToast('Profile updated successfully', 'success')
+    } catch (err: any) {
+      addToast(err.message || 'Failed to update profile', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handlePasswordChange = async () => {
+    if (passwordForm.new !== passwordForm.confirm) {
+      addToast('Passwords do not match', 'error')
+      return
+    }
+    if (passwordForm.new.length < 8) {
+      addToast('Password must be at least 8 characters', 'error')
+      return
+    }
+    setPasswordSaving(true)
+    try {
+      await authApi.changePassword({ currentPassword: passwordForm.current, newPassword: passwordForm.new })
+      addToast('Password changed successfully', 'success')
+      setPasswordForm({ current: '', new: '', confirm: '' })
+    } catch (err: any) {
+      addToast(err.message || 'Failed to change password', 'error')
+    } finally {
+      setPasswordSaving(false)
+    }
+  }
+
+  if (loading) return <Layout><div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading...</div></Layout>
+
+  return (
+    <Layout>
+      <div style={{ maxWidth: 700, margin: '0 auto' }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e0e0e0', marginBottom: 24 }}>Profile Settings</h1>
+
+        <div style={{ display: 'flex', gap: 4, marginBottom: 24, background: '#111827', borderRadius: 8, padding: 4, border: '1px solid #1f2937' }}>
+          {(['profile', 'security', 'account'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                flex: 1, padding: '10px 0', borderRadius: 6, border: 'none',
+                background: activeTab === tab ? '#2563eb' : 'transparent',
+                color: activeTab === tab ? '#fff' : '#9ca3af',
+                fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ background: '#111827', borderRadius: 12, padding: 24, border: '1px solid #1f2937' }}>
+          {activeTab === 'profile' && (
+            <div>
+              <h3 style={{ color: '#e0e0e0', fontSize: 16, marginBottom: 20 }}>Personal Information</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <Field label="First Name" value={form.firstName} onChange={v => update('firstName', v)} />
+                <Field label="Last Name" value={form.lastName} onChange={v => update('lastName', v)} />
+                <Field label="Phone" value={form.phone} onChange={v => update('phone', v)} type="tel" />
+                <Field label="Country" value={form.country} onChange={v => update('country', v)} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
+                <button onClick={handleSave} disabled={saving} style={{
+                  padding: '10px 24px', background: saving ? '#2563eb99' : '#2563eb',
+                  color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600,
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                }}>
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'security' && (
+            <div>
+              <h3 style={{ color: '#e0e0e0', fontSize: 16, marginBottom: 20 }}>Change Password</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 400 }}>
+                <Field label="Current Password" value={passwordForm.current} onChange={v => setPasswordForm(prev => ({ ...prev, current: v }))} type="password" />
+                <Field label="New Password" value={passwordForm.new} onChange={v => setPasswordForm(prev => ({ ...prev, new: v }))} type="password" />
+                <Field label="Confirm New Password" value={passwordForm.confirm} onChange={v => setPasswordForm(prev => ({ ...prev, confirm: v }))} type="password" />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
+                <button onClick={handlePasswordChange} disabled={passwordSaving} style={{
+                  padding: '10px 24px', background: passwordSaving ? '#2563eb99' : '#2563eb',
+                  color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600,
+                  cursor: passwordSaving ? 'not-allowed' : 'pointer',
+                }}>
+                  {passwordSaving ? 'Changing...' : 'Update Password'}
+                </button>
+              </div>
+
+              <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid #1f2937' }}>
+                <h4 style={{ color: '#e0e0e0', fontSize: 14, marginBottom: 12 }}>Danger Zone</h4>
+                <button onClick={() => { if (confirm('Are you sure you want to delete your account? This cannot be undone.')) logout() }} style={{
+                  padding: '10px 20px', background: '#ef4444', color: '#fff',
+                  border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                }}>
+                  Delete Account
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'account' && (
+            <div>
+              <h3 style={{ color: '#e0e0e0', fontSize: 16, marginBottom: 20 }}>Account Information</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 400 }}>
+                <InfoRow label="Email" value={user?.email || '—'} />
+                <InfoRow label="Role" value={user?.role || '—'} />
+                <InfoRow label="Member Since" value={user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </Layout>
+  )
+}
+
+function Field({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
+  return (
+    <div>
+      <label style={{ display: 'block', color: '#9ca3af', fontSize: 13, marginBottom: 6 }}>{label}</label>
+      <input type={type} value={value} onChange={e => onChange(e.target.value)} style={{
+        width: '100%', padding: '10px 12px', background: '#1f2937', border: '1px solid #374151',
+        borderRadius: 6, color: '#e0e0e0', fontSize: 14, boxSizing: 'border-box',
+      }} />
+    </div>
+  )
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #1f2937' }}>
+      <span style={{ color: '#6b7280' }}>{label}</span>
+      <span style={{ color: '#e0e0e0', fontWeight: 500 }}>{value}</span>
+    </div>
+  )
+}

@@ -1,0 +1,21 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+RUN npm ci
+
+# Copy source
+COPY . .
+
+# Build for production
+RUN npm run build
+
+# Install serve for production
+RUN npm install -g serve
+
+EXPOSE 5173
+
+# Use serve for production, or vite for development
+CMD ["serve", "-s", "dist", "-l", "5173"]

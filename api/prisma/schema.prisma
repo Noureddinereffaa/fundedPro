@@ -1,0 +1,290 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Users ──────────────────────────────────────────────────
+
+model User {
+  id                  String    @id @default(uuid())
+  email               String    @unique
+  passwordHash        String    @map("password_hash")
+  firstName           String?   @map("first_name")
+  lastName            String?   @map("last_name")
+  phone               String?
+  country             String?
+  avatar              String?
+  emailVerified       Boolean   @default(false) @map("email_verified")
+  emailVerifyToken    String?   @map("email_verify_token")
+  emailVerifyExpires  DateTime? @map("email_verify_expires")
+  resetPasswordToken  String?   @map("reset_password_token")
+  resetPasswordExpires DateTime? @map("reset_password_expires")
+  kycStatus           String    @default("none") @map("kyc_status")
+  kycDocuments        Json?     @map("kyc_documents")
+  role                String    @default("user")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  accounts            Account[]
+  payments            Payment[]
+  payoutRequests      PayoutRequest[]
+  refreshTokens       RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  userAgent String?  @map("user_agent")
+  ip        String?
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ── Accounts ───────────────────────────────────────────────
+
+model Account {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  accountType   String   @map("account_type")
+  accountSize   Decimal  @map("account_size") @db.Decimal(12, 2)
+  balance       Decimal  @db.Decimal(12, 2)
+  equity        Decimal  @db.Decimal(12, 2)
+  currency      String   @default("USD")
+  platform      String   @default("MT5")
+  login         String?
+  password      String?  @map("account_password")
+  server        String?
+  status        String   @default("active")
+  phase         String?
+  leverage      Int      @default(100)
+  profitTarget  Decimal? @map("profit_target") @db.Decimal(5, 2)
+  maxDailyLoss  Decimal? @map("max_daily_loss") @db.Decimal(5, 2)
+  maxOverallLoss Decimal? @map("max_overall_loss") @db.Decimal(5, 2)
+  maxPositionSize Decimal? @map("max_position_size") @db.Decimal(5, 2)
+  maxOpenTrades Int?     @map("max_open_trades")
+  minTradingDays Int?    @map("min_trading_days")
+  maxTradingDays Int?    @map("max_trading_days")
+  tradingDaysCount Int   @default(0) @map("trading_days_count")
+  startDate     DateTime? @map("start_date")
+  endDate       DateTime? @map("end_date")
+  passedAt      DateTime? @map("passed_at")
+  failedAt      DateTime? @map("failed_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user            User              @relation(fields: [userId], references: [id])
+  positions       Position[]
+  trades          Trade[]
+  orders          Order[]
+  payments        Payment[]
+  payoutRequests  PayoutRequest[]
+  violations      RuleViolation[]
+  dailySnapshots  DailySnapshot[]
+
+  @@map("accounts")
+}
+
+// ── Orders ─────────────────────────────────────────────────
+
+model Order {
+  id            String   @id @default(uuid())
+  accountId     String   @map("account_id")
+  symbol        String
+  type          String
+  side          String
+  volume        Decimal  @db.Decimal(10, 4)
+  price         Decimal? @db.Decimal(12, 6)
+  stopPrice     Decimal? @map("stop_price") @db.Decimal(12, 6)
+  stopLoss      Decimal? @map("stop_loss") @db.Decimal(12, 6)
+  takeProfit    Decimal? @map("take_profit") @db.Decimal(12, 6)
+  trailingStop  Decimal? @map("trailing_stop") @db.Decimal(12, 6)
+  trailingStep  Decimal? @map("trailing_step") @db.Decimal(12, 6)
+  breakEven     Boolean  @default(false)
+  timeInForce   String   @default("gtc") @map("time_in_force")
+  status        String   @default("pending")
+  filledVolume  Decimal? @map("filled_volume") @db.Decimal(10, 4)
+  filledPrice   Decimal? @map("filled_price") @db.Decimal(12, 6)
+  errorMessage  String?  @map("error_message")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  account  Account  @relation(fields: [accountId], references: [id])
+  position Position?
+
+  @@map("orders")
+}
+
+// ── Positions ──────────────────────────────────────────────
+
+model Position {
+  id            String   @id @default(uuid())
+  accountId     String   @map("account_id")
+  orderId       String?  @unique @map("order_id")
+  symbol        String
+  side          String
+  volume        Decimal  @db.Decimal(10, 4)
+  openPrice     Decimal  @map("open_price") @db.Decimal(12, 6)
+  currentPrice  Decimal? @map("current_price") @db.Decimal(12, 6)
+  stopLoss      Decimal? @map("stop_loss") @db.Decimal(12, 6)
+  takeProfit    Decimal? @map("take_profit") @db.Decimal(12, 6)
+  trailingStop  Decimal? @map("trailing_stop") @db.Decimal(12, 6)
+  trailingStep  Decimal? @map("trailing_step") @db.Decimal(12, 6)
+  breakEven     Boolean  @default(false)
+  swap          Decimal  @default(0) @db.Decimal(12, 2)
+  commission    Decimal  @default(0) @db.Decimal(12, 2)
+  profit        Decimal  @default(0) @db.Decimal(12, 2)
+  margin        Decimal  @default(0) @db.Decimal(12, 2)
+  status        String   @default("open")
+  openTime      DateTime @default(now()) @map("open_time")
+  closeTime     DateTime? @map("close_time")
+  closePrice    Decimal? @map("close_price") @db.Decimal(12, 6)
+  closeReason   String?  @map("close_reason")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  account Account @relation(fields: [accountId], references: [id])
+  order   Order?  @relation(fields: [orderId], references: [id])
+  trade   Trade?
+
+  @@map("positions")
+}
+
+// ── Trades ─────────────────────────────────────────────────
+
+model Trade {
+  id          String   @id @default(uuid())
+  accountId   String   @map("account_id")
+  positionId  String   @unique @map("position_id")
+  symbol      String
+  side        String
+  volume      Decimal  @db.Decimal(10, 4)
+  openPrice   Decimal  @map("open_price") @db.Decimal(12, 6)
+  closePrice  Decimal  @map("close_price") @db.Decimal(12, 6)
+  profit      Decimal  @db.Decimal(12, 2)
+  swap        Decimal  @default(0) @db.Decimal(12, 2)
+  commission  Decimal  @default(0) @db.Decimal(12, 2)
+  duration    Int?
+  openTime    DateTime @map("open_time")
+  closeTime   DateTime @map("close_time")
+  closeReason String?  @map("close_reason")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  account  Account  @relation(fields: [accountId], references: [id])
+  position Position @relation(fields: [positionId], references: [id])
+
+  @@map("trades")
+}
+
+// ── Rule Violations ────────────────────────────────────────
+
+model RuleViolation {
+  id           String @id @default(uuid())
+  accountId    String @map("account_id")
+  ruleType     String @map("rule_type")
+  description  String?
+  violationData Json? @map("violation_data")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@map("rule_violations")
+}
+
+// ── Payments ───────────────────────────────────────────────
+
+model Payment {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  accountId       String?  @map("account_id")
+  amount          Decimal  @db.Decimal(12, 2)
+  currency        String   @default("USD")
+  method          String?  @default("crypto")
+  walletAddress   String?  @map("wallet_address")
+  network         String?  // BTC, ETH, USDT-TRC20, USDT-ERC20
+  txHash          String?  @map("tx_hash")
+  confirmations   Int      @default(0)
+  metadata        Json?
+  status          String   @default("pending")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user    User    @relation(fields: [userId], references: [id])
+  account Account? @relation(fields: [accountId], references: [id])
+
+  @@map("payments")
+}
+
+// ── Payout Requests ────────────────────────────────────────
+
+model PayoutRequest {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  accountId String   @map("account_id")
+  amount    Decimal  @db.Decimal(12, 2)
+  method    String?
+  status    String   @default("pending")
+  processedAt DateTime? @map("processed_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id])
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@map("payout_requests")
+}
+
+// ── Daily Snapshots ────────────────────────────────────────
+
+model DailySnapshot {
+  id        String   @id @default(uuid())
+  accountId String   @map("account_id")
+  date      DateTime @db.Date
+  balance   Decimal  @db.Decimal(12, 2)
+  equity    Decimal  @db.Decimal(12, 2)
+  dailyPnl  Decimal  @default(0) @map("daily_pnl") @db.Decimal(12, 2)
+  totalPnl  Decimal  @default(0) @map("total_pnl") @db.Decimal(12, 2)
+  openPositions Int  @default(0) @map("open_positions")
+  margin    Decimal  @default(0) @db.Decimal(12, 2)
+  freeMargin Decimal @default(0) @map("free_margin") @db.Decimal(12, 2)
+  marginLevel Decimal? @map("margin_level") @db.Decimal(12, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@unique([accountId, date])
+  @@map("daily_snapshots")
+}
+
+// ── Trading Rules Config ───────────────────────────────────
+
+model TradingRuleConfig {
+  id              String   @id @default(uuid())
+  accountSize     Decimal  @map("account_size") @db.Decimal(12, 2)
+  phase           String
+  profitTarget    Decimal  @map("profit_target") @db.Decimal(5, 2)
+  maxDailyLoss    Decimal  @map("max_daily_loss") @db.Decimal(5, 2)
+  maxOverallLoss  Decimal  @map("max_overall_loss") @db.Decimal(5, 2)
+  maxPositionSize Decimal  @map("max_position_size") @db.Decimal(5, 2)
+  maxLeverage     Int      @map("max_leverage")
+  maxOpenTrades   Int      @map("max_open_trades")
+  minTradingDays  Int      @map("min_trading_days")
+  maxTradingDays  Int      @map("max_trading_days")
+  commission      Decimal  @default(0) @db.Decimal(8, 2)
+  spreadMarkup    Decimal  @default(0) @map("spread_markup") @db.Decimal(8, 2)
+  newsRestriction Boolean  @default(false) @map("news_restriction")
+  weekendTrading  Boolean  @default(false) @map("weekend_trading")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@unique([accountSize, phase])
+  @@map("trading_rule_configs")
+}
