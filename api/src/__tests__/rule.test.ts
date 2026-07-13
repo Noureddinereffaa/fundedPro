@@ -6,12 +6,26 @@ const mockPrisma = vi.hoisted(() => ({
   trade: { findMany: vi.fn(), create: vi.fn() },
   order: { findMany: vi.fn() },
   ruleViolation: { create: vi.fn() },
+  notification: { create: vi.fn().mockResolvedValue({}) },
+  user: { findUnique: vi.fn() },
+  tradingRuleConfig: { findUnique: vi.fn(), create: vi.fn() },
   $transaction: vi.fn((fn: any) => fn(mockPrisma)),
 }))
 
 vi.mock('../index.js', () => ({
   prisma: mockPrisma,
 }))
+
+vi.mock('../utils/helpers.js', async (importOriginal) => {
+  const actual: any = await importOriginal()
+  return {
+    ...actual,
+    isMarketOpen: vi.fn(() => true),
+  }
+})
+
+// Mock fetch for priceClient lookups
+vi.stubGlobal('fetch', vi.fn())
 
 import { RuleEngine } from '../services/rule.js'
 
@@ -20,6 +34,8 @@ describe('RuleEngine', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2023-11-15T12:00:00Z')) // Wednesday
     engine = new RuleEngine()
   })
 
@@ -41,7 +57,12 @@ describe('RuleEngine', () => {
       mockPrisma.trade.findMany.mockResolvedValue([])
       mockPrisma.position.findMany.mockResolvedValue([])
 
-      const result = await engine.checkOrder('acc1', { symbol: 'EURUSD', side: 'buy', volume: 0.1, price: 1.10000 })
+      const result = await engine.checkOrder('acc1', {
+        symbol: 'BTCUSDT',
+        side: 'buy',
+        volume: 0.1,
+        price: 30000,
+      })
       expect(result.allowed).toBe(true)
     })
 
@@ -60,7 +81,12 @@ describe('RuleEngine', () => {
         positions: [],
       })
 
-      const result = await engine.checkOrder('acc1', { symbol: 'EURUSD', side: 'buy', volume: 0.1, price: 1.10000 })
+      const result = await engine.checkOrder('acc1', {
+        symbol: 'BTCUSDT',
+        side: 'buy',
+        volume: 0.1,
+        price: 30000,
+      })
       expect(result.allowed).toBe(false)
       expect(result.reason).toContain('not active')
     })
@@ -80,7 +106,12 @@ describe('RuleEngine', () => {
         positions: [{ id: 'p1' }, { id: 'p2' }],
       })
 
-      const result = await engine.checkOrder('acc1', { symbol: 'EURUSD', side: 'buy', volume: 0.1, price: 1.10000 })
+      const result = await engine.checkOrder('acc1', {
+        symbol: 'BTCUSDT',
+        side: 'buy',
+        volume: 0.1,
+        price: 30000,
+      })
       expect(result.allowed).toBe(false)
       expect(result.reason).toContain('Maximum open trades')
     })
@@ -100,7 +131,12 @@ describe('RuleEngine', () => {
         positions: [],
       })
 
-      const result = await engine.checkOrder('acc1', { symbol: 'EURUSD', side: 'buy', volume: 10, price: 1.10000 })
+      const result = await engine.checkOrder('acc1', {
+        symbol: 'BTCUSDT',
+        side: 'buy',
+        volume: 10,
+        price: 30000,
+      })
       expect(result.allowed).toBe(false)
       expect(result.reason).toContain('exceeds maximum')
     })
@@ -120,19 +156,31 @@ describe('RuleEngine', () => {
         positions: [],
       })
 
-      const result = await engine.checkOrder('acc1', { symbol: 'EURUSD', side: 'buy', volume: 10, price: 1.10000 })
+      const result = await engine.checkOrder('acc1', {
+        symbol: 'BTCUSDT',
+        side: 'buy',
+        volume: 10,
+        price: 30000,
+      })
       expect(result.allowed).toBe(false)
     })
 
     it('rejects if no price provided', async () => {
       mockPrisma.account.findUnique.mockResolvedValue({
-        id: 'acc1', status: 'active', balance: 10000, equity: 10000,
-        accountSize: 10000, leverage: 100, maxPositionSize: 5,
-        maxOpenTrades: 10, maxDailyLoss: 6, maxOverallLoss: 10,
+        id: 'acc1',
+        status: 'active',
+        balance: 10000,
+        equity: 10000,
+        accountSize: 10000,
+        leverage: 100,
+        maxPositionSize: 5,
+        maxOpenTrades: 10,
+        maxDailyLoss: 6,
+        maxOverallLoss: 10,
         positions: [],
       })
 
-      const result = await engine.checkOrder('acc1', { symbol: 'EURUSD', side: 'buy', volume: 0.1, price: 0 })
+      const result = await engine.checkOrder('acc1', { symbol: 'BTCUSDT', side: 'buy', volume: 0.1, price: 0 })
       expect(result.allowed).toBe(false)
     })
   })
@@ -147,9 +195,7 @@ describe('RuleEngine', () => {
         { profit: 500, closeTime: later },
         { profit: -200, closeTime: later },
       ])
-      mockPrisma.position.findMany.mockResolvedValue([
-        { profit: 100 },
-      ])
+      mockPrisma.position.findMany.mockResolvedValue([{ profit: 100 }])
 
       const pnl = await engine.calculateDailyPnL('acc1')
       expect(pnl).toBe(400)
@@ -158,42 +204,46 @@ describe('RuleEngine', () => {
 
   describe('checkAllAccounts', () => {
     it('marks account as failed when overall loss exceeded', async () => {
-      mockPrisma.account.findMany.mockResolvedValue([{
-        id: 'acc1',
-        status: 'active',
-        balance: 8000,
-        accountSize: 10000,
-        equity: 8000,
-        leverage: 100,
-        maxPositionSize: 5,
-        maxOpenTrades: 10,
-        maxDailyLoss: 6,
-        maxOverallLoss: 10,
-        profitTarget: 8,
-        phase: 'evaluation_1',
-        positions: [],
-      }])
+      mockPrisma.account.findMany.mockResolvedValue([
+        {
+          id: 'acc1',
+          status: 'active',
+          balance: 8000,
+          accountSize: 10000,
+          equity: 8000,
+          leverage: 100,
+          maxPositionSize: 5,
+          maxOpenTrades: 10,
+          maxDailyLoss: 6,
+          maxOverallLoss: 10,
+          profitTarget: 8,
+          phase: 'evaluation_1',
+          positions: [],
+        },
+      ])
 
       await engine.checkAllAccounts()
       expect(mockPrisma.$transaction).toHaveBeenCalled()
     })
 
     it('marks account as passed when profit target met', async () => {
-      mockPrisma.account.findMany.mockResolvedValue([{
-        id: 'acc1',
-        status: 'active',
-        balance: 11000,
-        accountSize: 10000,
-        equity: 11000,
-        leverage: 100,
-        maxPositionSize: 5,
-        maxOpenTrades: 10,
-        maxDailyLoss: 6,
-        maxOverallLoss: 10,
-        profitTarget: 8,
-        phase: 'evaluation_1',
-        positions: [],
-      }])
+      mockPrisma.account.findMany.mockResolvedValue([
+        {
+          id: 'acc1',
+          status: 'active',
+          balance: 11000,
+          accountSize: 10000,
+          equity: 11000,
+          leverage: 100,
+          maxPositionSize: 5,
+          maxOpenTrades: 10,
+          maxDailyLoss: 6,
+          maxOverallLoss: 10,
+          profitTarget: 8,
+          phase: 'evaluation_1',
+          positions: [],
+        },
+      ])
 
       await engine.checkAllAccounts()
       expect(mockPrisma.account.update).toHaveBeenCalled()
@@ -202,60 +252,75 @@ describe('RuleEngine', () => {
 
   describe('checkMarginLevels', () => {
     it('triggers stop out when margin level < 50%', async () => {
-      mockPrisma.account.findMany.mockResolvedValue([{
-        id: 'acc1',
-        status: 'active',
-        balance: 1000,
-        accountSize: 10000,
-        equity: 1000,
-        leverage: 100,
-        maxPositionSize: 5,
-        maxOpenTrades: 10,
-        maxDailyLoss: 6,
-        maxOverallLoss: 10,
-        profitTarget: 8,
-        phase: 'evaluation_1',
-        positions: [{
+      vi.useRealTimers()
+      ;(globalThis.fetch as any).mockResolvedValue({
+        ok: true,
+        json: async () => ({ BTCUSDT: { price: 29500, change: -0.5, lastUpdated: Date.now(), age: 100 } }),
+      })
+      mockPrisma.account.findMany.mockResolvedValue([
+        {
+          id: 'acc1',
+          status: 'active',
+          balance: 1000,
+          accountSize: 10000,
+          equity: 1000,
+          leverage: 100,
+          maxPositionSize: 5,
+          maxOpenTrades: 10,
+          maxDailyLoss: 6,
+          maxOverallLoss: 10,
+          profitTarget: 8,
+          phase: 'evaluation_1',
+          positions: [
+            {
+              id: 'pos1',
+              symbol: 'BTCUSDT',
+              side: 'buy',
+              volume: 1,
+              openPrice: 30000,
+              currentPrice: 29500,
+              margin: 2000,
+              profit: -500,
+              swap: 0,
+              commission: 0,
+              openTime: new Date(),
+            },
+          ],
+        },
+      ])
+      mockPrisma.position.findMany.mockResolvedValue([
+        {
           id: 'pos1',
-          symbol: 'EURUSD',
+          accountId: 'acc1',
+          symbol: 'BTCUSDT',
           side: 'buy',
           volume: 1,
-          openPrice: 1.10000,
-          currentPrice: 1.09500,
+          openPrice: 30000,
+          currentPrice: 29500,
           margin: 2000,
+          profit: -500,
           swap: 0,
-          commission: 3.5,
+          commission: 0,
+          status: 'open',
           openTime: new Date(),
-        }],
-      }])
-      mockPrisma.position.findMany.mockResolvedValue([{
-        id: 'pos1',
-        accountId: 'acc1',
-        symbol: 'EURUSD',
-        side: 'buy',
-        volume: 1,
-        openPrice: 1.10000,
-        currentPrice: 1.09500,
-        margin: 2000,
-        swap: 0,
-        commission: 3.5,
-        status: 'open',
-        openTime: new Date(),
-      }])
+        },
+      ])
 
       await engine.checkMarginLevels()
       expect(mockPrisma.$transaction).toHaveBeenCalled()
     })
 
     it('does nothing if no open positions', async () => {
-      mockPrisma.account.findMany.mockResolvedValue([{
-        id: 'acc1',
-        status: 'active',
-        balance: 10000,
-        accountSize: 10000,
-        equity: 10000,
-        positions: [],
-      }])
+      mockPrisma.account.findMany.mockResolvedValue([
+        {
+          id: 'acc1',
+          status: 'active',
+          balance: 10000,
+          accountSize: 10000,
+          equity: 10000,
+          positions: [],
+        },
+      ])
 
       await engine.checkMarginLevels()
       expect(mockPrisma.$transaction).not.toHaveBeenCalled()

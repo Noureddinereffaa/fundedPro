@@ -1,27 +1,54 @@
 import { Router } from 'express'
+import { z } from 'zod'
 import { PaymentService } from '../services/payment.js'
 import { authenticate } from '../middleware/auth.js'
 import { AuthRequest } from '../types/index.js'
+import { AppError } from '../middleware/errorHandler.js'
+import { ACCOUNT_PRICES, ACCOUNT_SIZES } from '../utils/constants.js'
+
+const checkoutSchema = z.object({
+  accountSize: z.number().positive(),
+  accountType: z.enum(['evaluation', 'evaluation_1', 'funded']).transform((v) => v === 'evaluation' ? 'evaluation_1' : v),
+  promoCode: z.string().optional(),
+})
+
+const submitTxSchema = z.object({
+  txId: z.string().min(1),
+  txHash: z.string().min(1),
+})
+
+const payoutSchema = z.object({
+  accountId: z.string().min(1),
+  amount: z.number().positive(),
+  method: z.string().optional(),
+  walletAddress: z.string().optional(),
+})
 
 const router = Router()
 const paymentService = new PaymentService()
 
+router.get('/prices', (_req, res) => {
+  res.json({ sizes: ACCOUNT_SIZES, prices: ACCOUNT_PRICES })
+})
+
 router.post('/checkout', authenticate, async (req: AuthRequest, res) => {
   try {
-    const { accountSize, accountType } = req.body
-    const result = await paymentService.createCheckout(req.user!.id, accountSize, accountType)
+    const { accountSize, accountType, promoCode } = checkoutSchema.parse(req.body)
+    const result = await paymentService.createCheckout(req.user!.id, accountSize, accountType, promoCode)
     res.json(result)
   } catch (error: any) {
+    if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors[0].message })
     res.status(error.statusCode || 500).json({ error: error.message })
   }
 })
 
 router.post('/submit-tx', authenticate, async (req: AuthRequest, res) => {
   try {
-    const { txId, txHash } = req.body
+    const { txId, txHash } = submitTxSchema.parse(req.body)
     const result = await paymentService.submitTxHash(req.user!.id, txId, txHash)
     res.json(result)
   } catch (error: any) {
+    if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors[0].message })
     res.status(error.statusCode || 500).json({ error: error.message })
   }
 })
@@ -37,8 +64,18 @@ router.get('/status/:txId', authenticate, async (req: AuthRequest, res) => {
 
 router.post('/payout', authenticate, async (req: AuthRequest, res) => {
   try {
-    const { accountId, amount } = req.body
-    const result = await paymentService.requestPayout(req.user!.id, accountId, amount)
+    const { accountId, amount, method, walletAddress } = payoutSchema.parse(req.body)
+    const result = await paymentService.requestPayout(req.user!.id, accountId, amount, method, walletAddress)
+    res.json(result)
+  } catch (error: any) {
+    if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors[0].message })
+    res.status(error.statusCode || 500).json({ error: error.message })
+  }
+})
+
+router.get('/max-payout/:accountId', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const result = await paymentService.getMaxPayout(req.user!.id, req.params.accountId)
     res.json(result)
   } catch (error: any) {
     res.status(error.statusCode || 500).json({ error: error.message })
@@ -50,7 +87,8 @@ router.get('/payouts', authenticate, async (req: AuthRequest, res) => {
     const history = await paymentService.getPayoutHistory(req.user!.id)
     res.json(history)
   } catch (error: any) {
-    res.status(500).json({ error: error.message })
+    const statusCode = error instanceof AppError ? error.statusCode : 500
+    res.status(statusCode).json({ error: error.message })
   }
 })
 
@@ -59,7 +97,8 @@ router.get('/history', authenticate, async (req: AuthRequest, res) => {
     const history = await paymentService.getPaymentHistory(req.user!.id)
     res.json(history)
   } catch (error: any) {
-    res.status(500).json({ error: error.message })
+    const statusCode = error instanceof AppError ? error.statusCode : 500
+    res.status(statusCode).json({ error: error.message })
   }
 })
 

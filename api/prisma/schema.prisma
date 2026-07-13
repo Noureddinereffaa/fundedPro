@@ -26,6 +26,8 @@ model User {
   kycStatus           String    @default("none") @map("kyc_status")
   kycDocuments        Json?     @map("kyc_documents")
   role                String    @default("user")
+  loginAttempts       Int       @default(0) @map("login_attempts")
+  lockUntil           DateTime? @map("lock_until")
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
@@ -33,8 +35,51 @@ model User {
   payments            Payment[]
   payoutRequests      PayoutRequest[]
   refreshTokens       RefreshToken[]
+  alerts              Alert[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  userBadges          UserBadge[]
 
+  @@index([resetPasswordToken])
+  @@index([emailVerifyToken])
   @@map("users")
+}
+
+// ── Badges / Achievements ────────────────────────────────────
+
+model Badge {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  category    String   // progression | volume | profit | streak | risk | consistency | special
+  tier        Int      @default(1) // 1= bronze, 2= silver, 3= gold, 4= platinum
+  name        String
+  description String
+  icon        String   // emoji character
+  criteria    Json     // { type: "trades_count" | "profit" | "win_streak" | "trading_days" | "passed_evaluation" | "funded" | "payout" | "no_violations", value: number }
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  userBadges  UserBadge[]
+
+  @@map("badges")
+}
+
+model UserBadge {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  badgeId    String    @map("badge_id")
+  progress   Float     @default(0) // 0.0 → 1.0
+  unlocked   Boolean   @default(false)
+  unlockedAt DateTime? @map("unlocked_at")
+  metadata   Json?     // { currentValue: number, targetValue: number, ... }
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+  @@index([unlocked])
+  @@map("user_badges")
 }
 
 model RefreshToken {
@@ -48,6 +93,7 @@ model RefreshToken {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@map("refresh_tokens")
 }
 
@@ -61,7 +107,7 @@ model Account {
   balance       Decimal  @db.Decimal(12, 2)
   equity        Decimal  @db.Decimal(12, 2)
   currency      String   @default("USD")
-  platform      String   @default("MT5")
+  platform      String   @default("Pro FundX")
   login         String?
   password      String?  @map("account_password")
   server        String?
@@ -76,7 +122,8 @@ model Account {
   minTradingDays Int?    @map("min_trading_days")
   maxTradingDays Int?    @map("max_trading_days")
   tradingDaysCount Int   @default(0) @map("trading_days_count")
-  startDate     DateTime? @map("start_date")
+   lastTradingDay  DateTime? @map("last_trading_day")
+   startDate     DateTime? @map("start_date")
   endDate       DateTime? @map("end_date")
   passedAt      DateTime? @map("passed_at")
   failedAt      DateTime? @map("failed_at")
@@ -92,6 +139,9 @@ model Account {
   violations      RuleViolation[]
   dailySnapshots  DailySnapshot[]
 
+  @@index([userId])
+  @@index([status])
+  @@index([userId, status])
   @@map("accounts")
 }
 
@@ -104,24 +154,27 @@ model Order {
   type          String
   side          String
   volume        Decimal  @db.Decimal(10, 4)
-  price         Decimal? @db.Decimal(12, 6)
-  stopPrice     Decimal? @map("stop_price") @db.Decimal(12, 6)
-  stopLoss      Decimal? @map("stop_loss") @db.Decimal(12, 6)
-  takeProfit    Decimal? @map("take_profit") @db.Decimal(12, 6)
-  trailingStop  Decimal? @map("trailing_stop") @db.Decimal(12, 6)
-  trailingStep  Decimal? @map("trailing_step") @db.Decimal(12, 6)
+  price         Decimal? @db.Decimal(14, 8)
+  stopPrice     Decimal? @map("stop_price") @db.Decimal(14, 8)
+  stopLoss      Decimal? @map("stop_loss") @db.Decimal(14, 8)
+  takeProfit    Decimal? @map("take_profit") @db.Decimal(14, 8)
+  trailingStop  Decimal? @map("trailing_stop") @db.Decimal(14, 8)
+  trailingStep  Decimal? @map("trailing_step") @db.Decimal(14, 8)
   breakEven     Boolean  @default(false)
   timeInForce   String   @default("gtc") @map("time_in_force")
   status        String   @default("pending")
   filledVolume  Decimal? @map("filled_volume") @db.Decimal(10, 4)
-  filledPrice   Decimal? @map("filled_price") @db.Decimal(12, 6)
+  filledPrice   Decimal? @map("filled_price") @db.Decimal(14, 8)
   errorMessage  String?  @map("error_message")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  account  Account  @relation(fields: [accountId], references: [id])
+  account  Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
   position Position?
 
+  @@index([accountId])
+  @@index([status])
+  @@index([accountId, createdAt])
   @@map("orders")
 }
 
@@ -134,12 +187,12 @@ model Position {
   symbol        String
   side          String
   volume        Decimal  @db.Decimal(10, 4)
-  openPrice     Decimal  @map("open_price") @db.Decimal(12, 6)
-  currentPrice  Decimal? @map("current_price") @db.Decimal(12, 6)
-  stopLoss      Decimal? @map("stop_loss") @db.Decimal(12, 6)
-  takeProfit    Decimal? @map("take_profit") @db.Decimal(12, 6)
-  trailingStop  Decimal? @map("trailing_stop") @db.Decimal(12, 6)
-  trailingStep  Decimal? @map("trailing_step") @db.Decimal(12, 6)
+  openPrice     Decimal  @map("open_price") @db.Decimal(14, 8)
+  currentPrice  Decimal? @map("current_price") @db.Decimal(14, 8)
+  stopLoss      Decimal? @map("stop_loss") @db.Decimal(14, 8)
+  takeProfit    Decimal? @map("take_profit") @db.Decimal(14, 8)
+  trailingStop  Decimal? @map("trailing_stop") @db.Decimal(14, 8)
+  trailingStep  Decimal? @map("trailing_step") @db.Decimal(14, 8)
   breakEven     Boolean  @default(false)
   swap          Decimal  @default(0) @db.Decimal(12, 2)
   commission    Decimal  @default(0) @db.Decimal(12, 2)
@@ -148,15 +201,19 @@ model Position {
   status        String   @default("open")
   openTime      DateTime @default(now()) @map("open_time")
   closeTime     DateTime? @map("close_time")
-  closePrice    Decimal? @map("close_price") @db.Decimal(12, 6)
+  closePrice    Decimal? @map("close_price") @db.Decimal(14, 8)
   closeReason   String?  @map("close_reason")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  account Account @relation(fields: [accountId], references: [id])
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
   order   Order?  @relation(fields: [orderId], references: [id])
   trade   Trade?
 
+  @@index([accountId])
+  @@index([orderId])
+  @@index([status])
+  @@index([symbol, status])
   @@map("positions")
 }
 
@@ -169,8 +226,8 @@ model Trade {
   symbol      String
   side        String
   volume      Decimal  @db.Decimal(10, 4)
-  openPrice   Decimal  @map("open_price") @db.Decimal(12, 6)
-  closePrice  Decimal  @map("close_price") @db.Decimal(12, 6)
+  openPrice   Decimal  @map("open_price") @db.Decimal(14, 8)
+  closePrice  Decimal  @map("close_price") @db.Decimal(14, 8)
   profit      Decimal  @db.Decimal(12, 2)
   swap        Decimal  @default(0) @db.Decimal(12, 2)
   commission  Decimal  @default(0) @db.Decimal(12, 2)
@@ -181,8 +238,12 @@ model Trade {
   createdAt   DateTime @default(now()) @map("created_at")
 
   account  Account  @relation(fields: [accountId], references: [id])
-  position Position @relation(fields: [positionId], references: [id])
+  position Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
 
+  @@index([accountId])
+  @@index([positionId])
+  @@index([closeTime])
+  @@index([accountId, closeTime])
   @@map("trades")
 }
 
@@ -196,8 +257,9 @@ model RuleViolation {
   violationData Json? @map("violation_data")
   createdAt    DateTime @default(now()) @map("created_at")
 
-  account Account @relation(fields: [accountId], references: [id])
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
+  @@index([accountId])
   @@map("rule_violations")
 }
 
@@ -220,8 +282,10 @@ model Payment {
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   user    User    @relation(fields: [userId], references: [id])
-  account Account? @relation(fields: [accountId], references: [id])
+  account Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
 
+  @@index([userId])
+  @@index([accountId])
   @@map("payments")
 }
 
@@ -233,13 +297,18 @@ model PayoutRequest {
   accountId String   @map("account_id")
   amount    Decimal  @db.Decimal(12, 2)
   method    String?
+  walletAddress String? @map("wallet_address")
+  txHash    String?  @map("tx_hash")
   status    String   @default("pending")
   processedAt DateTime? @map("processed_at")
   createdAt DateTime @default(now()) @map("created_at")
 
-  user    User    @relation(fields: [userId], references: [id])
-  account Account @relation(fields: [accountId], references: [id])
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([accountId])
+  @@index([status])
   @@map("payout_requests")
 }
 
@@ -259,10 +328,68 @@ model DailySnapshot {
   marginLevel Decimal? @map("margin_level") @db.Decimal(12, 2)
   createdAt DateTime @default(now()) @map("created_at")
 
-  account Account @relation(fields: [accountId], references: [id])
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@unique([accountId, date])
   @@map("daily_snapshots")
+}
+
+// ── Alerts ─────────────────────────────────────────────────
+
+model Alert {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  symbol    String
+  condition String   // 'above' | 'below'
+  price     Decimal  @db.Decimal(14, 8)
+  message   String?
+  status    String   @default("active") // 'active' | 'triggered' | 'deleted'
+  triggeredAt DateTime? @map("triggered_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("alerts")
+}
+
+// ── Notifications ──────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  type      String   // 'alert_triggered' | 'payout_processed' | 'violation' | 'account_update' | 'system'
+  title     String
+  message   String?
+  data      Json?
+  link      String?  // optional navigation link
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, read])
+  @@map("notifications")
+}
+
+// ── Audit Log ──────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  adminId   String   @map("admin_id")
+  action    String   // 'approve_payment' | 'reject_payment' | 'update_rules' | 'update_user' | 'update_account'
+  target    String?  // e.g. user email, payment id, account id
+  details   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  admin User @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([createdAt])
+  @@map("audit_logs")
 }
 
 // ── Trading Rules Config ───────────────────────────────────
@@ -281,10 +408,50 @@ model TradingRuleConfig {
   maxTradingDays  Int      @map("max_trading_days")
   commission      Decimal  @default(0) @db.Decimal(8, 2)
   spreadMarkup    Decimal  @default(0) @map("spread_markup") @db.Decimal(8, 2)
-  newsRestriction Boolean  @default(false) @map("news_restriction")
-  weekendTrading  Boolean  @default(false) @map("weekend_trading")
-  createdAt       DateTime @default(now()) @map("created_at")
+   newsRestriction Boolean  @default(false) @map("news_restriction")
+   createdAt       DateTime @default(now()) @map("created_at")
 
   @@unique([accountSize, phase])
   @@map("trading_rule_configs")
+}
+
+// ── Coupons ────────────────────────────────────────────────
+
+model Coupon {
+  id              String   @id @default(uuid())
+  code            String   @unique
+  discountType    String   @default("percentage") // 'percentage' | 'fixed'
+  discountValue   Decimal  @db.Decimal(12, 2)
+  maxUses         Int?     @map("max_uses")
+  usedCount       Int      @default(0) @map("used_count")
+  expiresAt       DateTime? @map("expires_at")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("coupons")
+}
+
+// ── Platform Settings & Contact ──────────────────────────────────────────────
+
+model PlatformSetting {
+  key         String   @id
+  value       String   @db.Text
+  description String?
+  isPublic    Boolean  @default(false) @map("is_public")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
+}
+
+model ContactMessage {
+  id        String   @id @default(uuid())
+  name      String
+  email     String
+  subject   String
+  message   String   @db.Text
+  status    String   @default("unread") // unread | read | resolved
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("contact_messages")
 }

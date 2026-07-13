@@ -1,0 +1,48 @@
+{
+  "email": {
+    "welcome": {
+      "subject": "Welcome to ProFundX!",
+      "greeting": "Welcome to ProFundX!",
+      "body": "Thank you for creating an account. Please verify your email to get started.",
+      "cta": "Verify Email",
+      "footer": "If you didn't create this account, please ignore this email."
+    },
+    "passwordReset": {
+      "subject": "Reset Your ProFundX Password",
+      "greeting": "Password Reset Request",
+      "body": "Click the button below to reset your password. This link expires in 1 hour.",
+      "cta": "Reset Password",
+      "footer": "If you didn't request this, please ignore this email."
+    },
+    "payoutApproved": {
+      "subject": "Payout Approved — {{amount}}",
+      "greeting": "Your payout has been approved!",
+      "body": "Your payout request for {{amount}} has been approved and will be processed shortly.",
+      "cta": "View Payout"
+    },
+    "payoutRejected": {
+      "subject": "Payout Update",
+      "greeting": "Payout Status Update",
+      "body": "Your payout request for {{amount}} has been reviewed. Please contact support for details.",
+      "cta": "Contact Support"
+    },
+    "marginCall": {
+      "subject": "Margin Call — Account {{accountId}}",
+      "greeting": "Margin Call Alert",
+      "body": "Your account {{accountId}} has reached the margin call level. Please add funds or close positions to avoid liquidation.",
+      "cta": "View Account"
+    },
+    "stopOut": {
+      "subject": "Stop Out — Account {{accountId}}",
+      "greeting": "Stop Out Triggered",
+      "body": "Your account {{accountId}} has been stopped out. Some or all positions have been closed.",
+      "cta": "View Account"
+    },
+    "violation": {
+      "subject": "Rule Violation — Account {{accountId}}",
+      "greeting": "Trading Rule Violation",
+      "body": "Your account {{accountId}} has violated a trading rule: {{rule}}.",
+      "cta": "View Details"
+    }
+  }
+}

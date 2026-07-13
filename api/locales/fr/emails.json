@@ -1,0 +1,48 @@
+{
+  "email": {
+    "welcome": {
+      "subject": "Bienvenue chez ProFundX !",
+      "greeting": "Bienvenue chez ProFundX !",
+      "body": "Merci d'avoir créé un compte. Veuillez vérifier votre email pour commencer.",
+      "cta": "Vérifier l'Email",
+      "footer": "Si vous n'avez pas créé ce compte, ignorez cet email."
+    },
+    "passwordReset": {
+      "subject": "Réinitialisez votre mot de passe ProFundX",
+      "greeting": "Demande de réinitialisation du mot de passe",
+      "body": "Cliquez sur le bouton ci-dessous pour réinitialiser votre mot de passe. Ce lien expire dans 1 heure.",
+      "cta": "Réinitialiser le Mot de Passe",
+      "footer": "Si vous n'avez pas fait cette demande, ignorez cet email."
+    },
+    "payoutApproved": {
+      "subject": "Retrait approuvé — {{amount}}",
+      "greeting": "Votre retrait a été approuvé !",
+      "body": "Votre demande de retrait de {{amount}} a été approuvée et sera traitée prochainement.",
+      "cta": "Voir le Retrait"
+    },
+    "payoutRejected": {
+      "subject": "Mise à jour du retrait",
+      "greeting": "Mise à jour du statut de retrait",
+      "body": "Votre demande de retrait de {{amount}} a été examinée. Veuillez contacter le support pour plus de détails.",
+      "cta": "Contacter le Support"
+    },
+    "marginCall": {
+      "subject": "Appel de Marge — Compte {{accountId}}",
+      "greeting": "Alerte Appel de Marge",
+      "body": "Votre compte {{accountId}} a atteint le niveau d'appel de marge. Veuillez ajouter des fonds ou fermer des positions.",
+      "cta": "Voir le Compte"
+    },
+    "stopOut": {
+      "subject": "Stop Out — Compte {{accountId}}",
+      "greeting": "Stop Out Déclenché",
+      "body": "Votre compte {{accountId}} a été stop out. Certaines ou toutes les positions ont été fermées.",
+      "cta": "Voir le Compte"
+    },
+    "violation": {
+      "subject": "Violation de Règle — Compte {{accountId}}",
+      "greeting": "Violation de Règle de Trading",
+      "body": "Votre compte {{accountId}} a violé une règle de trading : {{rule}}.",
+      "cta": "Voir les Détails"
+    }
+  }
+}

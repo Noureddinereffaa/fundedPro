@@ -1,0 +1,358 @@
+.mw-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: #0d0f14;
+  color: #d1d4dc;
+  font-size: 12px;
+}
+
+/* ── Header ── */
+.mw-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid #1e222d;
+  flex-shrink: 0;
+}
+.mw-header-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #d1d4dc;
+  letter-spacing: 0.3px;
+}
+.mw-header-icon {
+  font-size: 14px;
+}
+.mw-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #787b86;
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+.mw-status-dot[data-status='connected'] {
+  background: #26a69a;
+  box-shadow: 0 0 5px #26a69a66;
+}
+.mw-status-dot[data-status='connecting'] {
+  background: #f59e0b;
+}
+.mw-count {
+  font-size: 10px;
+  color: #4a4e5a;
+  white-space: nowrap;
+}
+
+/* ── Search ── */
+.mw-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-bottom: 1px solid #1a1d27;
+  flex-shrink: 0;
+}
+.mw-search-icon {
+  color: #4a4e5a;
+  flex-shrink: 0;
+}
+.mw-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #d1d4dc;
+  font-size: 12px;
+  min-width: 0;
+}
+.mw-search-input::placeholder {
+  color: #4a4e5a;
+}
+.mw-search-clear {
+  background: transparent;
+  border: none;
+  color: #4a4e5a;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  transition: color 0.15s;
+}
+.mw-search-clear:hover {
+  color: #d1d4dc;
+}
+
+/* ── Group Tabs ── */
+.mw-group-tabs {
+  display: flex;
+  align-items: center;
+  padding: 5px 8px;
+  gap: 3px;
+  border-bottom: 1px solid #1a1d27;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.mw-group-tabs button {
+  background: transparent;
+  border: none;
+  color: #4a4e5a;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  transition: all 0.15s;
+  line-height: 1;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.mw-group-tabs button:hover {
+  background: #1e222d;
+  color: #a3a6af;
+}
+.mw-group-tabs button.active {
+  background: #2962ff22;
+  color: #2962ff;
+  font-weight: 600;
+}
+
+/* ── Symbol List ── */
+.mw-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.mw-list::-webkit-scrollbar {
+  width: 3px;
+}
+.mw-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.mw-list::-webkit-scrollbar-thumb {
+  background: #2a2e39;
+  border-radius: 2px;
+}
+
+/* ── Group ── */
+.mw-group {
+}
+.mw-group-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 5px 10px;
+  cursor: pointer;
+  color: #787b86;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  text-align: left;
+  transition: background 0.15s;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #0d0f14;
+  border-bottom: 1px solid #131621;
+  font-family: inherit;
+}
+.mw-group-header:hover {
+  background: #131621;
+}
+.mw-group-icon {
+  font-size: 11px;
+}
+.mw-group-name {
+  flex: 1;
+}
+.mw-group-count {
+  background: #1e222d;
+  color: #4a4e5a;
+  padding: 1px 5px;
+  border-radius: 8px;
+  font-size: 9px;
+}
+.mw-collapse-icon {
+  font-size: 9px;
+  color: #4a4e5a;
+  transition: transform 0.2s;
+}
+.mw-collapse-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+/* ── Symbols within a group ── */
+.mw-group-symbols {
+}
+
+/* ── Symbol Row ── */
+.mw-symbol-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-bottom: 1px solid #0f1119;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+}
+.mw-symbol-row:hover {
+  background: #131621;
+}
+.mw-symbol-row.active {
+  background: #162036;
+  border-left: 2px solid #2962ff;
+}
+.mw-symbol-row.flash-up {
+  animation: mwFlashUp 0.45s ease-out;
+}
+.mw-symbol-row.flash-down {
+  animation: mwFlashDown 0.45s ease-out;
+}
+.mw-symbol-row.closed {
+  opacity: 0.55;
+}
+
+@keyframes mwFlashUp {
+  0% { background: rgba(38, 166, 154, 0.22); }
+  100% { background: transparent; }
+}
+@keyframes mwFlashDown {
+  0% { background: rgba(239, 83, 80, 0.22); }
+  100% { background: transparent; }
+}
+
+/* ── Symbol Info ── */
+.mw-sym-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.mw-sym-main {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.mw-sym-code {
+  font-size: 11px;
+  font-weight: 700;
+  color: #d1d4dc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+.mw-sym-type {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #fff;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+.mw-sym-name {
+  font-size: 9px;
+  color: #4a4e5a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+  margin-top: 1px;
+}
+
+/* ── Price ── */
+.mw-sym-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+.mw-sym-price-val {
+  font-size: 11px;
+  font-weight: 600;
+  color: #d1d4dc;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  transition: color 0.15s;
+}
+.mw-sym-price-val.up {
+  color: #26a69a;
+}
+.mw-sym-price-val.down {
+  color: #ef5350;
+}
+.mw-sym-change {
+  font-size: 9px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.mw-sym-change.up {
+  color: #26a69a;
+}
+.mw-sym-change.down {
+  color: #ef5350;
+}
+
+/* ── Loading ── */
+.mw-sym-loading {
+  color: #2a2e39;
+  font-size: 10px;
+}
+
+/* ── Market Status ── */
+.mw-sym-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  flex-shrink: 0;
+}
+.mw-status-open {
+  color: #22c55e;
+  font-size: 10px;
+  text-shadow: 0 0 4px #22c55e66;
+}
+.mw-status-closed {
+  font-size: 7px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #ef4444;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+}
+
+/* ── RTL overrides ── */
+html.rtl .mw-group-header {
+  text-align: right;
+}
+html.rtl .mw-symbol-row {
+  text-align: right;
+}
+html.rtl .mw-symbol-row.active {
+  border-left: none;
+  border-right: 2px solid #2962ff;
+}
+html.rtl .mw-sym-price {
+  align-items: flex-start;
+}
+html.rtl .mw-sym-main {
+  flex-direction: row-reverse;
+}

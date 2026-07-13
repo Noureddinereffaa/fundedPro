@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
@@ -12,6 +13,19 @@ const rules: Record<string, { profitTarget: number | null; maxDailyLoss: number;
 }
 
 async function main() {
+  console.log('Seeding admin user...')
+  const adminEmail = 'admin@pro-fundx.com'
+  const existing = await prisma.user.findUnique({ where: { email: adminEmail } })
+  if (!existing) {
+    const hash = await bcrypt.hash('Admin123!', 12)
+    await prisma.user.create({
+      data: { email: adminEmail, passwordHash: hash, role: 'admin', emailVerified: true },
+    })
+    console.log(`Admin created: ${adminEmail} / Admin123!`)
+  } else {
+    console.log(`Admin already exists: ${adminEmail}`)
+  }
+
   console.log('Seeding trading rule configs...')
 
   for (const size of accountSizes) {

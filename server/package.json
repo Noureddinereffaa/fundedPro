@@ -1,13 +1,20 @@
 {
-  "name": "fundedpro-server",
+  "name": "pro-fundx-server",
   "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node --watch index.js"
+    "start": "node --env-file=../.env index.js",
+    "dev": "node --watch --env-file=../.env index.js"
   },
   "dependencies": {
+    "dotenv": "^17.4.2",
+    "ioredis": "^5.11.1",
     "ws": "^8.16.0"
-  }
+  },
+  "description": "",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }

@@ -1,0 +1,48 @@
+{
+  "email": {
+    "welcome": {
+      "subject": "¡Bienvenido a ProFundX!",
+      "greeting": "¡Bienvenido a ProFundX!",
+      "body": "Gracias por crear una cuenta. Verifique su correo para comenzar.",
+      "cta": "Verificar Correo",
+      "footer": "Si no creó esta cuenta, ignore este correo."
+    },
+    "passwordReset": {
+      "subject": "Restablezca su Contraseña de ProFundX",
+      "greeting": "Solicitud de Restablecimiento de Contraseña",
+      "body": "Haga clic en el botón de abajo para restablecer su contraseña. Este enlace expira en 1 hora.",
+      "cta": "Restablecer Contraseña",
+      "footer": "Si no solicitó esto, ignore este correo."
+    },
+    "payoutApproved": {
+      "subject": "Retiro Aprobado — {{amount}}",
+      "greeting": "¡Su retiro ha sido aprobado!",
+      "body": "Su solicitud de retiro de {{amount}} ha sido aprobada y será procesada pronto.",
+      "cta": "Ver Retiro"
+    },
+    "payoutRejected": {
+      "subject": "Actualización de Retiro",
+      "greeting": "Actualización del Estado del Retiro",
+      "body": "Su solicitud de retiro de {{amount}} ha sido revisada. Contacte al soporte para más detalles.",
+      "cta": "Contactar Soporte"
+    },
+    "marginCall": {
+      "subject": "Llamada de Margen — Cuenta {{accountId}}",
+      "greeting": "Alerta de Llamada de Margen",
+      "body": "Su cuenta {{accountId}} ha alcanzado el nivel de llamada de margen. Agregue fondos o cierre posiciones.",
+      "cta": "Ver Cuenta"
+    },
+    "stopOut": {
+      "subject": "Stop Out — Cuenta {{accountId}}",
+      "greeting": "Stop Out Activado",
+      "body": "Su cuenta {{accountId}} ha sido detenida. Algunas o todas las posiciones han sido cerradas.",
+      "cta": "Ver Cuenta"
+    },
+    "violation": {
+      "subject": "Violación de Regla — Cuenta {{accountId}}",
+      "greeting": "Violación de Regla de Trading",
+      "body": "Su cuenta {{accountId}} ha violado una regla de trading: {{rule}}.",
+      "cta": "Ver Detalles"
+    }
+  }
+}

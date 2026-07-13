@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { config } from '../config/index.js'
 import { AuthRequest, JwtPayload } from '../types/index.js'
+import { isBlacklisted } from '../utils/tokenBlacklist.js'
 
 export function authenticate(req: AuthRequest, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization
@@ -9,6 +10,11 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
 
   if (!token) {
     res.status(401).json({ error: 'Access denied. No token provided.' })
+    return
+  }
+
+  if (isBlacklisted(token)) {
+    res.status(401).json({ error: 'Token has been revoked.' })
     return
   }
 
@@ -36,8 +42,12 @@ export function authorize(...roles: string[]) {
 }
 
 export function generateTokens(payload: JwtPayload) {
-  const accessToken = jwt.sign(payload as object, config.JWT_SECRET, { expiresIn: config.JWT_EXPIRES_IN } as jwt.SignOptions)
-  const refreshToken = jwt.sign(payload as object, config.JWT_REFRESH_SECRET, { expiresIn: config.JWT_REFRESH_EXPIRES_IN } as jwt.SignOptions)
+  const accessToken = jwt.sign(payload as object, config.JWT_SECRET, {
+    expiresIn: config.JWT_EXPIRES_IN,
+  } as jwt.SignOptions)
+  const refreshToken = jwt.sign(payload as object, config.JWT_REFRESH_SECRET, {
+    expiresIn: config.JWT_REFRESH_EXPIRES_IN,
+  } as jwt.SignOptions)
   return { accessToken, refreshToken }
 }
 

@@ -9,6 +9,10 @@ import { EmailService } from './email.js'
 
 const emailService = new EmailService()
 
+function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex')
+}
+
 export class AuthService {
   async register(email: string, password: string, firstName?: string, lastName?: string) {
     const existing = await prisma.user.findUnique({ where: { email } })
@@ -27,7 +31,7 @@ export class AuthService {
     const verifyToken = crypto.randomBytes(32).toString('hex')
     await prisma.user.update({
       where: { id: user.id },
-      data: { emailVerifyToken: verifyToken, emailVerifyExpires: new Date(Date.now() + 24 * 60 * 60 * 1000) },
+      data: { emailVerifyToken: hashToken(verifyToken), emailVerifyExpires: new Date(Date.now() + 24 * 60 * 60 * 1000) },
     })
     await emailService.sendVerification(email, verifyToken)
 
@@ -39,14 +43,46 @@ export class AuthService {
     const user = await prisma.user.findUnique({ where: { email } })
     if (!user) throw new AppError('Invalid email or password', 401)
 
+    // Check if account is locked
+    if (user.lockUntil && user.lockUntil > new Date()) {
+      const remaining = Math.ceil((user.lockUntil.getTime() - Date.now()) / 60000)
+      throw new AppError(`Account locked. Try again in ${remaining} minute(s)`, 423)
+    }
+
     const valid = await bcrypt.compare(password, user.passwordHash)
-    if (!valid) throw new AppError('Invalid email or password', 401)
+    if (!valid) {
+      const attempts = user.loginAttempts + 1
+      if (attempts >= 5) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { loginAttempts: 0, lockUntil: new Date(Date.now() + 15 * 60 * 1000) },
+        })
+        throw new AppError('Account locked for 15 minutes due to too many failed attempts', 423)
+      }
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { loginAttempts: attempts },
+      })
+      throw new AppError('Invalid email or password', 401)
+    }
+
+    // Reset lockout on successful login
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { loginAttempts: 0, lockUntil: null },
+    })
 
     const tokens = generateTokens({ id: user.id, email: user.email, role: user.role })
     await this.saveRefreshToken(user.id, tokens.refreshToken, userAgent, ip)
 
     return {
-      user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role },
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+      },
       ...tokens,
     }
   }
@@ -76,16 +112,26 @@ export class AuthService {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
-        id: true, email: true, firstName: true, lastName: true,
-        phone: true, country: true, avatar: true, kycStatus: true,
-        role: true, createdAt: true,
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        country: true,
+        avatar: true,
+        kycStatus: true,
+        role: true,
+        createdAt: true,
       },
     })
     if (!user) throw new AppError('User not found', 404)
     return user
   }
 
-  async updateProfile(userId: string, data: { firstName?: string; lastName?: string; phone?: string; country?: string }) {
+  async updateProfile(
+    userId: string,
+    data: { firstName?: string; lastName?: string; phone?: string; country?: string },
+  ) {
     return prisma.user.update({
       where: { id: userId },
       data,
@@ -119,7 +165,7 @@ export class AuthService {
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        resetPasswordToken: resetToken,
+        resetPasswordToken: hashToken(resetToken),
         resetPasswordExpires: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
       },
     })
@@ -129,7 +175,7 @@ export class AuthService {
   async resetPassword(token: string, password: string) {
     const user = await prisma.user.findFirst({
       where: {
-        resetPasswordToken: token,
+        resetPasswordToken: hashToken(token),
         resetPasswordExpires: { gt: new Date() },
       },
     })
@@ -146,7 +192,7 @@ export class AuthService {
   async verifyResetToken(token: string) {
     const user = await prisma.user.findFirst({
       where: {
-        resetPasswordToken: token,
+        resetPasswordToken: hashToken(token),
         resetPasswordExpires: { gt: new Date() },
       },
     })
@@ -156,7 +202,7 @@ export class AuthService {
   async verifyEmail(token: string) {
     const user = await prisma.user.findFirst({
       where: {
-        emailVerifyToken: token,
+        emailVerifyToken: hashToken(token),
         emailVerifyExpires: { gt: new Date() },
       },
     })

@@ -1,15 +1,27 @@
 import { Router } from 'express'
 import { z } from 'zod'
+import jwt from 'jsonwebtoken'
 import { AuthService } from '../services/auth.js'
 import { authenticate } from '../middleware/auth.js'
-import { AuthRequest } from '../types/index.js'
+import { AuthRequest, JwtPayload } from '../types/index.js'
+import { config } from '../config/index.js'
+import { AppError } from '../middleware/errorHandler.js'
+import { addToBlacklist } from '../utils/tokenBlacklist.js'
+import { authLimiter, registerLimiter, forgotPasswordLimiter, changePasswordLimiter } from '../utils/rateLimiters.js'
 
 const router = Router()
 const authService = new AuthService()
 
+const passwordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+  .regex(/[0-9]/, 'Password must contain at least one number')
+  .regex(/[!@#$%^&*(),.?":{}|<>_\-]/, 'Password must contain at least one special character')
+
 const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: passwordSchema,
   firstName: z.string().optional(),
   lastName: z.string().optional(),
 })
@@ -20,10 +32,15 @@ const loginSchema = z.object({
 })
 
 const isProd = process.env.NODE_ENV === 'production'
-const cookieOpts = { httpOnly: true, secure: isProd, sameSite: 'lax' as const, maxAge: 7 * 24 * 60 * 60 * 1000 }
+const cookieOpts = {
+  httpOnly: true,
+  secure: isProd,
+  sameSite: 'lax' as const,
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+}
 
 // Register
-router.post('/register', async (req, res) => {
+router.post('/register', registerLimiter, async (req, res) => {
   try {
     const data = registerSchema.parse(req.body)
     const result = await authService.register(data.email, data.password, data.firstName, data.lastName)
@@ -35,7 +52,7 @@ router.post('/register', async (req, res) => {
 })
 
 // Login
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   try {
     const data = loginSchema.parse(req.body)
     const result = await authService.login(data.email, data.password, req.headers['user-agent'], req.ip)
@@ -47,7 +64,7 @@ router.post('/login', async (req, res) => {
 })
 
 // Forgot password
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
   try {
     const { email } = req.body
     if (!email) return res.status(400).json({ error: 'Email is required' })
@@ -63,6 +80,10 @@ router.post('/reset-password', async (req, res) => {
   try {
     const { token, password } = req.body
     if (!token || !password) return res.status(400).json({ error: 'Token and password are required' })
+    const pwdResult = passwordSchema.safeParse(password)
+    if (!pwdResult.success) {
+      return res.status(400).json({ error: pwdResult.error.issues[0].message })
+    }
     await authService.resetPassword(token, password)
     res.json({ message: 'Password reset successfully' })
   } catch (error: any) {
@@ -70,13 +91,26 @@ router.post('/reset-password', async (req, res) => {
   }
 })
 
-// Verify email
+// Verify email — for browser redirect from email link
 router.get('/verify-email/:token', async (req, res) => {
   try {
     await authService.verifyEmail(req.params.token)
-    res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/verify-email/${req.params.token}`)
+    res.redirect(`${config.CLIENT_URL}/verify-email/${req.params.token}`)
   } catch (error: any) {
-    res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/verify-email/${req.params.token}?error=invalid`)
+    res.redirect(`${config.CLIENT_URL}/verify-email/${req.params.token}?error=invalid`)
+  }
+})
+
+// Verify email — JSON API for frontend
+router.post('/verify-email', async (req, res) => {
+  try {
+    const { token } = req.body
+    if (!token) return res.status(400).json({ error: 'Token is required' })
+    await authService.verifyEmail(token)
+    res.json({ message: 'Email verified successfully' })
+  } catch (error: any) {
+    const statusCode = error instanceof AppError ? error.statusCode : 400
+    res.status(statusCode).json({ error: error.message || 'Invalid or expired verification link' })
   }
 })
 
@@ -106,12 +140,24 @@ router.post('/refresh', async (req, res) => {
 // Logout
 router.post('/logout', async (req, res) => {
   try {
-    const token = req.cookies?.refreshToken || req.body.token
-    if (token) await authService.logout(token)
+    const refreshToken = req.cookies?.refreshToken || req.body.token
+    if (refreshToken) {
+      await authService.logout(refreshToken)
+      // Also blacklist the access token if provided
+      const authHeader = req.headers.authorization
+      if (authHeader?.startsWith('Bearer ')) {
+        const accessToken = authHeader.slice(7)
+        try {
+          const decoded = jwt.verify(accessToken, config.JWT_SECRET) as JwtPayload
+          addToBlacklist(accessToken, (decoded as any).exp * 1000)
+        } catch { /* token already expired — ignore */ }
+      }
+    }
     res.clearCookie('refreshToken')
     res.json({ message: 'Logged out' })
   } catch (error: any) {
-    res.status(500).json({ error: error.message })
+    const statusCode = error instanceof AppError ? error.statusCode : 500
+    res.status(statusCode).json({ error: error.message })
   }
 })
 
@@ -136,9 +182,15 @@ router.put('/me', authenticate, async (req: AuthRequest, res) => {
 })
 
 // Change password
-router.post('/change-password', authenticate, async (req: AuthRequest, res) => {
+router.post('/change-password', authenticate, changePasswordLimiter, async (req: AuthRequest, res) => {
   try {
     const { currentPassword, newPassword } = req.body
+    if (newPassword) {
+      const pwdResult = passwordSchema.safeParse(newPassword)
+      if (!pwdResult.success) {
+        return res.status(400).json({ error: pwdResult.error.issues[0].message })
+      }
+    }
     await authService.changePassword(req.user!.id, currentPassword, newPassword)
     res.json({ message: 'Password changed' })
   } catch (error: any) {

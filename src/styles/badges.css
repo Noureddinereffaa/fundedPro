@@ -1,0 +1,199 @@
+/* ── Badges Page ────────────────────────────────────────────── */
+
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.badge-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 16px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  text-align: center;
+  width: 100%;
+  font-family: inherit;
+}
+
+.badge-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.badge-unlocked:hover {
+  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.15);
+}
+
+.badge-icon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+  transition: transform 0.2s;
+}
+
+.badge-card:hover .badge-icon {
+  transform: scale(1.1);
+}
+
+.badge-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.badge-name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.badge-tier {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-progress-wrapper {
+  width: 100%;
+  height: 4px;
+  background: #1f2937;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.badge-progress-bar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+.badge-progress-text {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* ── Badge Modal ───────────────────────────────────────────── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.badge-modal {
+  width: 100%;
+  max-width: 400px;
+  position: relative;
+  animation: modalFadeIn 0.2s ease;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  color: #6b7280;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ── Responsive ────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .badge-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 10px;
+  }
+
+  .badge-card {
+    padding: 16px 12px 12px;
+  }
+
+  .badge-icon {
+    width: 48px;
+    height: 48px;
+    font-size: 1.6rem !important;
+  }
+
+  .badge-name {
+    font-size: 12px;
+  }
+
+  .badges-overview > div {
+    flex-direction: column;
+  }
+
+  .badges-stats {
+    width: 100%;
+    justify-content: space-around;
+  }
+
+  .badge-filter-btn {
+    font-size: 12px !important;
+    padding: 5px 12px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .badge-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .badge-card {
+    padding: 12px 8px;
+  }
+
+  .badge-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.4rem !important;
+  }
+
+  .badges-overview {
+    padding: 16px !important;
+  }
+
+  .badges-stats > div > div:first-child {
+    font-size: 18px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .badge-grid {
+    grid-template-columns: 1fr;
+  }
+}

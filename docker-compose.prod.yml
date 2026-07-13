@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  api:
+    environment:
+      NODE_ENV: production
+      CLIENT_URL: ${CLIENT_URL:-https://profundx.com}
+      API_URL: ${API_URL:-https://profundx.com/api}
+
+  ws-server:
+    environment:
+      NODE_ENV: production
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./dist:/usr/share/nginx/html:ro

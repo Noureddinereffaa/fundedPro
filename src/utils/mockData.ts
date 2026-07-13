@@ -1,37 +1,55 @@
-import type { Kline } from './marketData'
+import type { Kline } from '../../shared/types'
 
-const BASE_PRICES: Record<string, { price: number; spread: number; volatility: number }> = {
-  EURUSD: { price: 1.0850, spread: 0.0001, volatility: 0.0005 },
-  GBPUSD: { price: 1.2650, spread: 0.0002, volatility: 0.0006 },
-  USDJPY: { price: 151.50, spread: 0.01, volatility: 0.05 },
-  AUDUSD: { price: 0.6550, spread: 0.0001, volatility: 0.0005 },
-  USDCAD: { price: 1.3650, spread: 0.0001, volatility: 0.0005 },
-  NZDUSD: { price: 0.5950, spread: 0.0001, volatility: 0.0005 },
-  XAUUSD: { price: 2320.00, spread: 0.10, volatility: 1.50 },
-  XAGUSD: { price: 27.50, spread: 0.01, volatility: 0.10 },
+export const MOCK_PRICES: Record<string, { price: number; spread: number; volatility: number }> = {
+  BTCUSDT: { price: 62850.0, spread: 1.0, volatility: 200.0 },
+  ETHUSDT: { price: 1790.0, spread: 0.1, volatility: 20.0 },
+  SOLUSDT: { price: 80.8, spread: 0.05, volatility: 2.0 },
+  XRPUSDT: { price: 1.17, spread: 0.001, volatility: 0.01 },
+  ADAUSDT: { price: 0.191, spread: 0.001, volatility: 0.005 },
+  DOGEUSDT: { price: 0.0785, spread: 0.001, volatility: 0.003 },
+  BNBUSDT: { price: 576.0, spread: 0.1, volatility: 5.0 },
+  AVAXUSDT: { price: 6.98, spread: 0.05, volatility: 0.5 },
+  DOTUSDT: { price: 0.89, spread: 0.01, volatility: 0.03 },
+  LINKUSDT: { price: 8.09, spread: 0.01, volatility: 0.15 },
+  LTCUSDT: { price: 45.2, spread: 0.05, volatility: 1.0 },
+  UNIUSDT: { price: 3.26, spread: 0.01, volatility: 0.1 },
 }
 
 function resolutionToSeconds(resolution: string): number {
+  const n = Number(resolution)
+  if (!isNaN(n) && n > 0) return n
   const map: Record<string, number> = {
-    '1': 60, '3': 180, '5': 300, '15': 900,
-    '30': 1800, '60': 3600, '120': 7200,
-    '240': 14400, '360': 21600, '720': 43200,
-    'D': 86400, 'W': 604800, 'M': 2592000,
+    D: 86400,
+    W: 604800,
+    M: 2592000,
   }
   return map[resolution] || 3600
 }
 
-export function generateMockKlines(
-  symbol: string,
-  resolution: string,
-  from: number,
-  to: number,
-): Kline[] {
-  const config = BASE_PRICES[symbol]
-  if (!config) return []
+export function getMockConfig(symbol: string): { price: number; spread: number; volatility: number } {
+  if (MOCK_PRICES[symbol]) return MOCK_PRICES[symbol]
+  const base = symbol.replace('USDT', '').replace('USD', '')
+  const seed = Math.abs(hashString(base))
+  const hashNorm = (seed % 1000) / 1000
+  const lowPriceTokens = new Set(['SHIB', 'PEPE', 'BONK', 'FLOKI', 'BOME', 'NOT'])
+  const midPriceTokens = new Set(['TRX', 'VET', 'ADA', 'XRP', 'DOGE', 'ALGO', 'MANA', 'SAND', 'CHZ', 'GRT', 'FTM', 'FET', 'JUP', 'ENA', 'PYTH', 'ONDO', 'SEI', 'STRK', 'WLD', 'MANTA', 'TNSR', 'AEVO', 'ETHFI', 'ZK'])
+  if (lowPriceTokens.has(base)) {
+    const price = +(hashNorm * 0.001 + 0.00001).toFixed(6)
+    return { price, spread: price * 0.001, volatility: price * 2 }
+  }
+  if (midPriceTokens.has(base)) {
+    const price = +(hashNorm * 5 + 0.1).toFixed(4)
+    return { price, spread: price * 0.001, volatility: price * 0.05 }
+  }
+  const price = +(hashNorm * 50 + 0.5).toFixed(2)
+  return { price, spread: price * 0.001, volatility: price * 0.1 }
+}
+
+export function generateMockKlines(symbol: string, resolution: string, from: number, to: number): Kline[] {
+  const config = getMockConfig(symbol)
 
   const interval = resolutionToSeconds(resolution)
-  const count = Math.min(Math.floor((to - from) / interval), 5000)
+  const count = Math.min(Math.floor((to - from) / interval), 20000)
   const result: Kline[] = []
   const seed = hashString(symbol)
   let rngState = seed
@@ -45,23 +63,65 @@ export function generateMockKlines(
   const spread = config.spread
   const vol = config.volatility
 
+  const time = from
+  let trendAngle = 0
+  let trendTimer = 0
+  let lastSessionDay = -1
   for (let i = 0; i < count; i++) {
-    const time = from + i * interval
-    const change = (nextRandom() - 0.5) * vol * 2
+    const curTime = time + i * interval
+
+    const session = new Date(curTime * 1000).getUTCDay()
+
+    // Gap at session start
+    if (session !== lastSessionDay) {
+      lastSessionDay = session
+      if (result.length > 0) {
+        const gapSize = (nextRandom() - 0.5) * vol * 2
+        price = result[result.length - 1].close + gapSize
+        if (price <= 0) price = config.price
+      }
+    }
+
+    // Trend with longer persistence
+    trendTimer++
+    if (trendTimer > 5 + Math.floor(nextRandom() * 15)) {
+      trendAngle += (nextRandom() - 0.5) * 0.6
+      trendAngle = Math.max(-1, Math.min(1, trendAngle))
+      trendTimer = 0
+    }
+    const trend = trendAngle * vol * 0.4
+
+    const noise = (nextRandom() - 0.5) * vol * 1.2
+    const change = trend + noise
     price = price + change
+    if (price <= 0) price = config.price
 
     const open = price
-    const high = open + nextRandom() * vol
-    const low = open - nextRandom() * vol
-    const close = open + (nextRandom() - 0.5) * vol * 0.5
+    const bodyRange = nextRandom() * vol * 0.5
+    const wickTop = nextRandom() * vol * 0.3
+    const wickBottom = nextRandom() * vol * 0.3
+    const direction = nextRandom() > 0.5 ? 1 : -1
+
+    const bodyHigh = direction > 0 ? bodyRange : 0
+    const bodyLow = direction < 0 ? bodyRange : 0
+    let high = open + Math.max(wickTop, bodyHigh * 1.1)
+    let low = open - Math.max(wickBottom, bodyLow * 1.1)
+    let close = open + direction * bodyRange
+
+    high = Math.max(high, open, close)
+    low = Math.min(low, open, close)
+
+    const volumeBase = 1000 + nextRandom() * 9000
+    const volSpike = Math.abs(change / vol) > 0.8 ? 2 + nextRandom() * 3 : 1
+    const volume = Math.floor(volumeBase * volSpike)
 
     result.push({
-      time,
+      time: curTime,
       open: roundToSpread(open, spread),
-      high: roundToSpread(Math.max(open, high, close), spread),
-      low: roundToSpread(Math.min(open, low, close), spread),
+      high: roundToSpread(high, spread),
+      low: roundToSpread(low, spread),
       close: roundToSpread(close, spread),
-      volume: Math.floor(nextRandom() * 10000),
+      volume,
     })
   }
 
@@ -78,16 +138,14 @@ function hashString(str: string): number {
   let hash = 0
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i)
-    hash = ((hash << 5) - hash) + char
+    hash = (hash << 5) - hash + char
     hash = hash & hash
   }
   return Math.abs(hash)
 }
 
 export function generateMockTicker(symbol: string): { price: number; change: number } {
-  const config = BASE_PRICES[symbol]
-  if (!config) return { price: 0, change: 0 }
-
+  const config = getMockConfig(symbol)
   const basePrice = config.price
   const change = (Math.random() - 0.5) * 2
   return {

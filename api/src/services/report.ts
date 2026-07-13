@@ -11,8 +11,8 @@ export class ReportService {
       where: { accountId, closeTime: { gte: start, lte: end } },
     })
 
-    const wins = trades.filter(t => Number(t.profit) > 0)
-    const losses = trades.filter(t => Number(t.profit) < 0)
+    const wins = trades.filter((t) => Number(t.profit) > 0)
+    const losses = trades.filter((t) => Number(t.profit) < 0)
     const totalPnl = trades.reduce((sum, t) => sum + Number(t.profit), 0)
 
     return {
@@ -22,7 +22,7 @@ export class ReportService {
       losses: losses.length,
       winRate: trades.length > 0 ? ((wins.length / trades.length) * 100).toFixed(1) : '0',
       totalPnl: totalPnl.toFixed(2),
-      trades: trades.map(t => ({
+      trades: trades.map((t) => ({
         symbol: t.symbol,
         side: t.side,
         volume: t.volume,
@@ -44,7 +44,7 @@ export class ReportService {
       take: days,
     })
 
-    return snapshots.map(s => ({
+    return snapshots.map((s) => ({
       date: s.date,
       equity: s.equity,
       balance: s.balance,
@@ -57,27 +57,37 @@ export class ReportService {
     const trades = await prisma.trade.findMany({ where: { accountId } })
     if (trades.length === 0) return null
 
-    const profits: number[] = trades.map(t => Number(t.profit))
-    const wins: number[] = profits.filter(p => p > 0)
-    const losses: number[] = profits.filter(p => p < 0)
+    const profits: number[] = trades.map((t) => Number(t.profit))
+    const wins: number[] = profits.filter((p) => p > 0)
+    const losses: number[] = profits.filter((p) => p < 0)
 
     const totalProfit: number = wins.reduce((s: number, p: number) => s + p, 0)
     const totalLoss: number = Math.abs(losses.reduce((s: number, p: number) => s + p, 0))
 
-    const durations: number[] = trades.filter(t => t.duration).map(t => t.duration as number)
-    const avgDuration: number = durations.length > 0 ? durations.reduce((s: number, d: number) => s + d, 0) / durations.length : 0
+    const durations: number[] = trades.filter((t) => t.duration).map((t) => t.duration as number)
+    const avgDuration: number =
+      durations.length > 0 ? durations.reduce((s: number, d: number) => s + d, 0) / durations.length : 0
 
     const avgWin = wins.length > 0 ? totalProfit / wins.length : 0
     const avgLoss = losses.length > 0 ? totalLoss / losses.length : 0
     const winRate = wins.length / trades.length
     const expectancy = winRate * avgWin - (1 - winRate) * avgLoss
 
-    let maxConsecutiveWins = 0, maxConsecutiveLosses = 0
-    let currentWins = 0, currentLosses = 0
+    let maxConsecutiveWins = 0,
+      maxConsecutiveLosses = 0
+    let currentWins = 0,
+      currentLosses = 0
     for (const p of profits) {
-      if (p > 0) { currentWins++; currentLosses = 0 }
-      else if (p < 0) { currentLosses++; currentWins = 0 }
-      else { currentWins = 0; currentLosses = 0 }
+      if (p > 0) {
+        currentWins++
+        currentLosses = 0
+      } else if (p < 0) {
+        currentLosses++
+        currentWins = 0
+      } else {
+        currentWins = 0
+        currentLosses = 0
+      }
       maxConsecutiveWins = Math.max(maxConsecutiveWins, currentWins)
       maxConsecutiveLosses = Math.max(maxConsecutiveLosses, currentLosses)
     }
@@ -112,11 +122,13 @@ export class ReportService {
       symbolMap.set(t.symbol, existing)
     }
 
-    return Array.from(symbolMap.entries()).map(([symbol, data]) => ({
-      symbol,
-      trades: data.trades,
-      pnl: data.pnl.toFixed(2),
-      winRate: ((data.wins / data.trades) * 100).toFixed(1),
-    })).sort((a, b) => Number(b.pnl) - Number(a.pnl))
+    return Array.from(symbolMap.entries())
+      .map(([symbol, data]) => ({
+        symbol,
+        trades: data.trades,
+        pnl: data.pnl.toFixed(2),
+        winRate: ((data.wins / data.trades) * 100).toFixed(1),
+      }))
+      .sort((a, b) => Number(b.pnl) - Number(a.pnl))
   }
 }

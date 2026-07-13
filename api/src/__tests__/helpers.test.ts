@@ -33,98 +33,66 @@ describe('generateAccountPassword', () => {
 
   it('contains special characters', () => {
     const pws = Array.from({ length: 20 }, () => generateAccountPassword())
-    expect(pws.some(pw => /[!@#$%]/.test(pw))).toBe(true)
+    expect(pws.some((pw) => /[!@#$%]/.test(pw))).toBe(true)
   })
 })
 
 describe('getContractSize', () => {
-  it('returns 100000 for forex majors', () => {
-    expect(getContractSize('EURUSD')).toBe(100000)
-    expect(getContractSize('GBPUSD')).toBe(100000)
-  })
-
-  it('returns 100 for XAUUSD (gold)', () => {
-    expect(getContractSize('XAUUSD')).toBe(100)
-  })
-
-  it('returns 5000 for XAGUSD (silver)', () => {
-    expect(getContractSize('XAGUSD')).toBe(5000)
-  })
-
   it('returns 1 for crypto', () => {
     expect(getContractSize('BTCUSDT')).toBe(1)
     expect(getContractSize('ETHUSDT')).toBe(1)
   })
 
-  it('returns 50 for SPX', () => {
-    expect(getContractSize('SPX')).toBe(50)
+  it('returns 1 for RWA tokens', () => {
+    expect(getContractSize('ONDOUSDT')).toBe(1)
+    expect(getContractSize('MKRUSDT')).toBe(1)
   })
 
-  it('returns 20 for NDX', () => {
-    expect(getContractSize('NDX')).toBe(20)
-  })
-
-  it('returns 1000 for USOIL', () => {
-    expect(getContractSize('USOIL')).toBe(1000)
-  })
-
-  it('returns default 100000 for unknown symbols', () => {
-    expect(getContractSize('UNKNOWN')).toBe(100000)
+  it('returns default 1 for unknown symbols', () => {
+    expect(getContractSize('UNKNOWN')).toBe(1)
   })
 })
 
 describe('getSymbolCategory', () => {
-  it('returns forex for EURUSD', () => {
-    expect(getSymbolCategory('EURUSD')).toBe('forex')
-  })
-
-  it('returns metals for XAUUSD', () => {
-    expect(getSymbolCategory('XAUUSD')).toBe('metals')
-  })
-
   it('returns crypto for BTCUSDT', () => {
     expect(getSymbolCategory('BTCUSDT')).toBe('crypto')
   })
 
-  it('returns indices for SPX', () => {
-    expect(getSymbolCategory('SPX')).toBe('indices')
+  it('returns rwa for ONDOUSDT', () => {
+    expect(getSymbolCategory('ONDOUSDT')).toBe('rwa')
   })
 
-  it('returns oil for USOIL', () => {
-    expect(getSymbolCategory('USOIL')).toBe('oil')
-  })
-
-  it('returns forex as default for unknown', () => {
-    expect(getSymbolCategory('UNKNOWN')).toBe('forex')
+  it('returns crypto as default for unknown', () => {
+    expect(getSymbolCategory('UNKNOWN')).toBe('crypto')
   })
 })
 
 describe('calculatePnL', () => {
-  it('calculates buy PnL correctly for EURUSD', () => {
-    // Buy 1 lot EURUSD at 1.10000, close at 1.10500
-    // diff = 1.10500 - 1.10000 = 0.00500
-    // PnL = 0.00500 * 1 * 100000 = 500 USD
-    const pnl = calculatePnL('buy', 1.10000, 1.10500, 1, 'EURUSD')
-    expect(pnl).toBe(500)
+  it('calculates buy PnL correctly for BTCUSDT', () => {
+    // Buy 1 BTCUSDT at 30000, close at 31000
+    // diff = 31000 - 30000 = 1000
+    // PnL = 1000 * 1 * 1 = 1000 USD
+    const pnl = calculatePnL('buy', 30000, 31000, 1, 'BTCUSDT')
+    expect(pnl).toBe(1000)
   })
 
-  it('calculates sell PnL correctly for EURUSD', () => {
-    // Sell 1 lot EURUSD at 1.10000, close at 1.09500
-    // diff = 1.10000 - 1.09500 = 0.00500
-    const pnl = calculatePnL('sell', 1.10000, 1.09500, 1, 'EURUSD')
-    expect(pnl).toBe(500)
+  it('calculates sell PnL correctly for BTCUSDT', () => {
+    // Sell 1 BTCUSDT at 30000, close at 29000
+    // diff = 30000 - 29000 = 1000
+    const pnl = calculatePnL('sell', 30000, 29000, 1, 'BTCUSDT')
+    expect(pnl).toBe(1000)
   })
 
   it('returns negative PnL for losing buy trade', () => {
-    const pnl = calculatePnL('buy', 1.10000, 1.09500, 1, 'EURUSD')
-    expect(pnl).toBe(-500)
+    const pnl = calculatePnL('buy', 30000, 29000, 1, 'BTCUSDT')
+    expect(pnl).toBe(-1000)
   })
 
-  it('calculates XAUUSD PnL (contractSize=100)', () => {
-    // Buy 1 lot XAU at 1900.00, close at 1910.00
-    // diff = 10.00 * 1 * 100 = 1000 USD
-    const pnl = calculatePnL('buy', 1900.00, 1910.00, 1, 'XAUUSD')
-    expect(pnl).toBe(1000)
+  it('calculates PnL for RWA token', () => {
+    // Buy 1 ONDOUSDT at 0.80, close at 1.00
+    // diff = 0.20 * 1 * 1 = 0.20 USD
+    const pnl = calculatePnL('buy', 0.8, 1.0, 1, 'ONDOUSDT')
+    expect(pnl).toBe(0.2)
   })
 
   it('calculates BTCUSDT PnL (contractSize=1)', () => {
@@ -132,41 +100,28 @@ describe('calculatePnL', () => {
     expect(pnl).toBe(1000)
   })
 
-  it('handles USDJPY (divides by close price)', () => {
-    // Buy 1 lot USDJPY at 150.00, close at 151.00
-    // diff = 1.00 * 1 * 100000 = 100000 JPY / 151.00 = ~662.25 USD
-    const pnl = calculatePnL('buy', 150.00, 151.00, 1, 'USDJPY')
-    expect(pnl).toBeCloseTo(662.25, 0)
-  })
-
   it('returns 0 for zero volume', () => {
-    const pnl = calculatePnL('buy', 1.10000, 1.10500, 0, 'EURUSD')
+    const pnl = calculatePnL('buy', 30000, 31000, 0, 'BTCUSDT')
     expect(pnl).toBe(0)
   })
 })
 
 describe('calculateMargin', () => {
-  it('calculates margin for EURUSD with 1:100 leverage', () => {
-    // 1 lot * 100000 * 1.10 / 100 = 1100
-    const margin = calculateMargin(1, 1.10, 100, 'EURUSD')
-    expect(margin).toBe(1100)
-  })
-
-  it('calculates margin for XAUUSD with 1:100 leverage', () => {
-    // 1 lot * 100 * 1900 / 100 = 1900
-    const margin = calculateMargin(1, 1900, 100, 'XAUUSD')
-    expect(margin).toBe(1900)
-  })
-
   it('calculates margin for BTCUSDT with 1:50 leverage', () => {
     // 1 lot * 1 * 30000 / 50 = 600
     const margin = calculateMargin(1, 30000, 50, 'BTCUSDT')
     expect(margin).toBe(600)
   })
 
+  it('calculates margin for BTCUSDT with 1:100 leverage', () => {
+    // 1 lot * 1 * 30000 / 100 = 300
+    const margin = calculateMargin(1, 30000, 100, 'BTCUSDT')
+    expect(margin).toBe(300)
+  })
+
   it('uses default contractSize if no symbol provided', () => {
-    const margin = calculateMargin(1, 1.10, 100)
-    expect(margin).toBe(1100)
+    const margin = calculateMargin(1, 30000, 100)
+    expect(margin).toBe(300)
   })
 })
 

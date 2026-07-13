@@ -1,0 +1,76 @@
+.chart-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.toolbar-group {
+  display: flex;
+  gap: 2px;
+}
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: #2a2e39;
+}
+.app.light .toolbar-divider {
+  background: #e0e3eb;
+}
+.toolbar-spacer {
+  flex: 1;
+}
+.toolbar-btn {
+  padding: 3px 10px;
+  border: none;
+  background: transparent;
+  color: #787b86;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.toolbar-btn:hover {
+  color: #d1d4dc;
+  background: #1e222d;
+}
+.app.light .toolbar-btn:hover {
+  color: #131722;
+  background: #f0f3fa;
+}
+.toolbar-btn.active {
+  color: #2962ff;
+  background: #1e222d;
+}
+.app.light .toolbar-btn.active {
+  color: #2962ff;
+  background: #e8f0fe;
+}
+
+.chart-wrapper {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.bottombar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: #787b86;
+  border-top: 1px solid #1e222d;
+  background: #131722;
+}
+.app.light .bottombar {
+  background: #ffffff;
+  border-color: #e0e3eb;
+}
+.bottombar-sep {
+  color: #2a2e39;
+}
+.app.light .bottombar-sep {
+  color: #e0e3eb;
+}

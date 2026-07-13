@@ -4,11 +4,11 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
-    container_name: fundedpro-postgres
+    container_name: pro-fundx-postgres
     environment:
       POSTGRES_DB: fundedpro
       POSTGRES_USER: fundedpro
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-fundedpro123}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pro-fundx123}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -18,85 +18,147 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 2.0
+
+  # Redis (for WS server state coordination)
+  redis:
+    image: redis:7-alpine
+    container_name: pro-fundx-redis
+    command: redis-server --appendonly yes --appendfsync everysec --requirepass ${REDIS_PASSWORD:-vzWfhsVDtVaRNDb4N9z_-K8utpq5lIjx}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-vzWfhsVDtVaRNDb4N9z_-K8utpq5lIjx}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
 
   # Backend API
   api:
     build:
       context: ./api
       dockerfile: Dockerfile
-    container_name: fundedpro-api
+    container_name: pro-fundx-api
     environment:
-      DATABASE_URL: postgresql://fundedpro:${DB_PASSWORD:-fundedpro123}@postgres:5432/fundedpro?schema=public
-      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-your-super-secret-refresh-key-change-in-production}
-      JWT_EXPIRES_IN: 24h
-      JWT_REFRESH_EXPIRES_IN: 7d
+      DATABASE_URL: postgresql://fundedpro:${DB_PASSWORD:-pro-fundx123}@postgres:5432/fundedpro?schema=public
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER}
       SMTP_PASS: ${SMTP_PASS}
-      CLIENT_URL: ${CLIENT_URL:-http://localhost}
-      API_URL: http://localhost:3001
-      PORT: 3001
+      CLIENT_URL: ${CLIENT_URL:?CLIENT_URL is required}
+      API_URL: ${API_URL:-https://your-domain.com/api}
+      API_PORT: ${API_PORT:-3001}
       NODE_ENV: production
+      REDIS_URL: redis://:${REDIS_PASSWORD:-vzWfhsVDtVaRNDb4N9z_-K8utpq5lIjx}@redis:6379
+      BTC_WALLET: ${BTC_WALLET}
+      ETH_WALLET: ${ETH_WALLET}
+      USDT_TRC20_WALLET: ${USDT_TRC20_WALLET}
+      USDT_ERC20_WALLET: ${USDT_ERC20_WALLET}
+      SERVER_TIMEZONE_OFFSET: ${SERVER_TIMEZONE_OFFSET:-3}
+      WS_SERVER_URL: http://ws-server:3002
     ports:
       - "3001:3001"
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1.0
 
   # WebSocket Data Server
   ws-server:
     build:
       context: .
       dockerfile: Dockerfile.ws
-    container_name: fundedpro-ws
+    container_name: pro-fundx-ws
     environment:
       PORT: 3002
       NODE_ENV: production
+      TWELVEDATA_API_KEY: ${TWELVEDATA_API_KEY}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-vzWfhsVDtVaRNDb4N9z_-K8utpq5lIjx}@redis:6379
     ports:
       - "3002:3002"
-    restart: unless-stopped
-
-  # Frontend (Vite dev server for development, or Nginx for production)
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-    container_name: fundedpro-frontend
-    environment:
-      VITE_API_URL: http://localhost:3001/api
-      VITE_WS_URL: ws://localhost:3002
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./src:/app/src
-      - ./public:/app/public
-      - ./index.html:/app/index.html
-      - ./vite.config.ts:/app/vite.config.ts
     depends_on:
-      - api
-      - ws-server
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1.0
 
-  # Nginx Reverse Proxy (Production)
+  # Nginx Reverse Proxy
   nginx:
     image: nginx:alpine
-    container_name: fundedpro-nginx
+    container_name: pro-fundx-nginx
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
+      - ./dist:/usr/share/nginx/html:ro
     depends_on:
       - api
-      - frontend
       - ws-server
     restart: unless-stopped
+
+  # Certbot (Let's Encrypt auto-renewal)
+  certbot:
+    image: certbot/certbot
+    container_name: pro-fundx-certbot
+    volumes:
+      - ./ssl:/etc/letsencrypt
+      - ./dist:/var/www/html
+    entrypoint: >
+      /bin/sh -c "
+        trap exit TERM;
+        while true; do
+          certbot renew --webroot -w /var/www/html;
+          sleep 12h;
+        done
+      "
+    profiles:
+      - production
+
+  # Automated PostgreSQL Backup (runs daily at 3am)
+  db-backup:
+    image: postgres:16-alpine
+    container_name: pro-fundx-db-backup
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: fundedpro
+      DB_USER: fundedpro
+      DB_PASSWORD: ${DB_PASSWORD:-pro-fundx123}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - db_backups:/backups
+      - ./scripts/backup.sh:/usr/local/bin/backup.sh:ro
+    entrypoint: |
+      sh -c "
+        echo '0 3 * * * /usr/local/bin/backup.sh /backups' > /etc/crontabs/root
+        echo 'Backup scheduler started — runs daily at 3am'
+        crond -f -l 2
+      "
+    depends_on:
+      postgres:
+        condition: service_healthy
     profiles:
       - production
 
 volumes:
   postgres_data:
+  redis_data:
+  db_backups:

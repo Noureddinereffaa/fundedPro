@@ -1,0 +1,95 @@
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid #1e222d;
+  background: #131722;
+  min-height: 48px;
+}
+.app.light .topbar {
+  background: #ffffff;
+  border-color: #e0e3eb;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.logo {
+  font-weight: 700;
+  font-size: 18px;
+  color: #2962ff;
+  letter-spacing: -0.5px;
+}
+.symbol-select {
+  padding: 4px 12px;
+  border: 1px solid #2a2e39;
+  border-radius: 4px;
+  background: #1e222d;
+  color: #d1d4dc;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  min-width: 120px;
+}
+.app.light .symbol-select {
+  background: #f7f8fa;
+  color: #131722;
+  border-color: #e0e3eb;
+}
+
+.current-price {
+  font-size: 20px;
+  font-weight: 700;
+  color: #d1d4dc;
+}
+.app.light .current-price {
+  color: #131722;
+}
+.price-change {
+  font-size: 13px;
+  color: #787b86;
+}
+.price-change.positive {
+  color: #26a69a;
+}
+.price-change.negative {
+  color: #ef5350;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.account-info {
+  display: flex;
+  gap: 20px;
+  font-size: 12px;
+  color: #787b86;
+}
+.account-info strong {
+  color: #d1d4dc;
+  font-weight: 600;
+}
+.app.light .account-info strong {
+  color: #131722;
+}
+.account-info .profit {
+  color: #26a69a;
+}
+
+.theme-btn {
+  padding: 4px 10px;
+  border: 1px solid #2a2e39;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+.app.light .theme-btn {
+  border-color: #e0e3eb;
+}

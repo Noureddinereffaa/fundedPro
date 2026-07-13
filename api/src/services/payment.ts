@@ -2,45 +2,43 @@ import { prisma } from '../index.js'
 import { AppError } from '../middleware/errorHandler.js'
 import { config } from '../config/index.js'
 import { PROFIT_SPLIT } from '../utils/constants.js'
-import { AccountService } from './account.js'
-
-const isDev = config.NODE_ENV === 'development'
+import { randomBytes } from 'crypto'
 
 const CRYPTO_WALLETS = {
-  BTC: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
-  ETH: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18',
-  'USDT-TRC20': 'TN2YhN7bVvKJwHbSKuYRmFjzQxqFfFfFfF',
-  'USDT-ERC20': '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18',
+  BTC: config.BTC_WALLET,
+  ETH: config.ETH_WALLET,
+  'USDT-TRC20': config.USDT_TRC20_WALLET,
+  'USDT-ERC20': config.USDT_ERC20_WALLET,
 }
 
 function generateTxId() {
-  return `TX_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+  return `TX_${Date.now()}_${randomBytes(4).toString('hex')}`
 }
 
 export class PaymentService {
-  async createCheckout(userId: string, accountSize: number, accountType: string) {
+  async createCheckout(userId: string, accountSize: number, accountType: string, promoCode?: string) {
     const { ACCOUNT_PRICES } = await import('../utils/constants.js')
     const pricing = ACCOUNT_PRICES[accountSize as keyof typeof ACCOUNT_PRICES]
     if (!pricing) throw new AppError('Invalid account size', 400)
 
-    const amount = accountType === 'funded' ? pricing.instant : pricing.evaluation
+    let amount = accountType === 'funded' ? pricing.instant : pricing.evaluation
+    let discount = 0
 
-    if (isDev) {
-      const accountService = new AccountService()
-      await prisma.payment.create({
-        data: {
-          userId,
-          amount,
-          currency: 'USD',
-          method: 'crypto',
-          walletAddress: CRYPTO_WALLETS.BTC,
-          network: 'BTC',
-          status: 'completed',
-        },
-      })
-      const phase = accountType === 'funded' ? 'funded' : 'evaluation_1'
-      const { account } = await accountService.purchaseAccount(userId, accountSize, phase as any)
-      return { url: `/payment/success?dev=1&accountId=${account.id}`, accountId: account.id }
+    if (promoCode) {
+      const coupon = await prisma.coupon.findUnique({ where: { code: promoCode.toUpperCase() } })
+      if (!coupon || !coupon.isActive) throw new AppError('Invalid or inactive promo code', 400)
+      if (coupon.expiresAt && new Date() > coupon.expiresAt) throw new AppError('Promo code has expired', 400)
+      if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) throw new AppError('Promo code usage limit reached', 400)
+      
+      if (coupon.discountType === 'percentage') {
+        discount = (amount * Number(coupon.discountValue)) / 100
+      } else {
+        discount = Number(coupon.discountValue)
+      }
+      
+      amount = Math.max(0, amount - discount)
+      
+      // We don't increment usedCount yet, it should ideally be incremented when payment is approved.
     }
 
     const txId = generateTxId()
@@ -53,7 +51,7 @@ export class PaymentService {
         walletAddress: CRYPTO_WALLETS.BTC,
         network: 'BTC',
         status: 'pending',
-        metadata: { txId, accountSize, accountType, createdAt: new Date().toISOString() },
+        metadata: { txId, accountSize, accountType, promoCode, discount, createdAt: new Date().toISOString() },
       },
     })
 
@@ -79,7 +77,10 @@ export class PaymentService {
 
     const updated = await prisma.payment.update({
       where: { id: payment.id },
-      data: { txHash, metadata: { ...(payment.metadata as any || {}), txHash, submittedAt: new Date().toISOString() } },
+      data: {
+        txHash,
+        metadata: { ...((payment.metadata as any) || {}), txHash, submittedAt: new Date().toISOString() },
+      },
     })
     return updated
   }
@@ -96,22 +97,51 @@ export class PaymentService {
     // Crypto payments don't use webhooks — admin verifies manually
   }
 
-  async requestPayout(userId: string, accountId: string, amount: number) {
+  async getMaxPayout(userId: string, accountId: string) {
     const account = await prisma.account.findFirst({
       where: { id: accountId, userId, status: 'funded' },
     })
     if (!account) throw new AppError('Account not found or not funded', 404)
 
     const trades = await prisma.trade.findMany({ where: { accountId } })
-    const totalProfit = trades.reduce((sum: number, t: any) => sum + Number(t.profit), 0)
-    const payoutAmount = totalProfit * PROFIT_SPLIT
+    const totalProfit = trades.reduce((sum: number, t: any) => sum + Math.max(0, Number(t.profit)), 0)
+    const totalLoss = Math.abs(trades.reduce((sum: number, t: any) => sum + Math.min(0, Number(t.profit)), 0))
+    const netProfit = totalProfit - totalLoss
 
-    if (amount > payoutAmount) {
-      throw new AppError(`Maximum payout available: $${payoutAmount.toFixed(2)}`, 400)
+    const previousPayouts = await prisma.payoutRequest.aggregate({
+      where: { accountId, status: 'completed' },
+      _sum: { amount: true },
+    })
+    const totalPaidOut = Number(previousPayouts._sum.amount || 0)
+
+    const availableProfit = Math.max(0, netProfit - totalPaidOut)
+    return { maxPayout: availableProfit * PROFIT_SPLIT, netProfit, profitSplit: PROFIT_SPLIT, totalPaidOut }
+  }
+
+  async requestPayout(
+    userId: string,
+    accountId: string,
+    amount: number,
+    method?: string,
+    walletAddress?: string,
+  ) {
+    const account = await prisma.account.findFirst({
+      where: { id: accountId, userId, status: 'funded' },
+    })
+    if (!account) throw new AppError('Account not found or not funded', 404)
+
+    const pending = await prisma.payoutRequest.findFirst({
+      where: { accountId, status: 'pending' },
+    })
+    if (pending) throw new AppError('A payout request is already pending for this account', 400)
+
+    const { maxPayout } = await this.getMaxPayout(userId, accountId)
+    if (amount > maxPayout) {
+      throw new AppError(`Maximum payout available: $${maxPayout.toFixed(2)}`, 400)
     }
 
     return prisma.payoutRequest.create({
-      data: { userId, accountId, amount, status: 'pending' },
+      data: { userId, accountId, amount, method, walletAddress, status: 'pending' },
     })
   }
 

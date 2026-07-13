@@ -1,0 +1,48 @@
+{
+  "email": {
+    "welcome": {
+      "subject": "Selamat Datang di ProFundX!",
+      "greeting": "Selamat Datang di ProFundX!",
+      "body": "Terima kasih telah membuat akun. Silakan verifikasi email Anda untuk memulai.",
+      "cta": "Verifikasi Email",
+      "footer": "Jika Anda tidak membuat akun ini, abaikan email ini."
+    },
+    "passwordReset": {
+      "subject": "Atur Ulang Kata Sandi ProFundX Anda",
+      "greeting": "Permintaan Atur Ulang Kata Sandi",
+      "body": "Klik tombol di bawah untuk mengatur ulang kata sandi Anda. Tautan ini berlaku selama 1 jam.",
+      "cta": "Atur Ulang Kata Sandi",
+      "footer": "Jika Anda tidak meminta ini, abaikan email ini."
+    },
+    "payoutApproved": {
+      "subject": "Penarikan Disetujui — {{amount}}",
+      "greeting": "Penarikan Anda telah disetujui!",
+      "body": "Permintaan penarikan sebesar {{amount}} telah disetujui dan akan segera diproses.",
+      "cta": "Lihat Penarikan"
+    },
+    "payoutRejected": {
+      "subject": "Pembaruan Penarikan",
+      "greeting": "Pembaruan Status Penarikan",
+      "body": "Permintaan penarikan sebesar {{amount}} telah ditinjau. Hubungi dukungan untuk detail.",
+      "cta": "Hubungi Dukungan"
+    },
+    "marginCall": {
+      "subject": "Margin Call — Akun {{accountId}}",
+      "greeting": "Peringatan Margin Call",
+      "body": "Akun Anda {{accountId}} telah mencapai level margin call. Harap tambah dana atau tutup posisi.",
+      "cta": "Lihat Akun"
+    },
+    "stopOut": {
+      "subject": "Stop Out — Akun {{accountId}}",
+      "greeting": "Stop Out Terpicu",
+      "body": "Akun Anda {{accountId}} telah di-stop out. Beberapa atau semua posisi telah ditutup.",
+      "cta": "Lihat Akun"
+    },
+    "violation": {
+      "subject": "Pelanggaran Aturan — Akun {{accountId}}",
+      "greeting": "Pelanggaran Aturan Trading",
+      "body": "Akun Anda {{accountId}} telah melanggar aturan trading: {{rule}}.",
+      "cta": "Lihat Detail"
+    }
+  }
+}

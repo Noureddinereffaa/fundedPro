@@ -1,0 +1,102 @@
+.main-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.watchlist-group-label {
+  padding: 8px 12px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #787b86;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.market-badge {
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: #2962ff20;
+  color: #2962ff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.watchlist {
+  width: 220px;
+  border-right: 1px solid #1e222d;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  background: #131722;
+}
+.app.light .watchlist {
+  background: #ffffff;
+  border-color: #e0e3eb;
+}
+.watchlist-header {
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #787b86;
+  border-bottom: 1px solid #1e222d;
+}
+.app.light .watchlist-header {
+  border-color: #e0e3eb;
+}
+.watchlist-list {
+  flex: 1;
+  overflow-y: auto;
+}
+.watchlist-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  border-bottom: 1px solid #1e222d;
+  transition: background 0.1s;
+}
+.app.light .watchlist-item {
+  border-color: #e0e3eb;
+}
+.watchlist-item:hover {
+  background: #1e222d;
+}
+.app.light .watchlist-item:hover {
+  background: #f0f3fa;
+}
+.watchlist-item.selected {
+  background: #1e222d;
+  border-left: 2px solid #2962ff;
+}
+.app.light .watchlist-item.selected {
+  background: #f0f3fa;
+}
+.wl-symbol {
+  font-weight: 600;
+  color: #d1d4dc;
+}
+.app.light .wl-symbol {
+  color: #131722;
+}
+.wl-price {
+  text-align: right;
+  color: #d1d4dc;
+}
+.app.light .wl-price {
+  color: #131722;
+}
+.wl-change {
+  text-align: right;
+}
+.watchlist-item.up .wl-change {
+  color: #26a69a;
+}
+.watchlist-item.down .wl-change {
+  color: #ef5350;
+}

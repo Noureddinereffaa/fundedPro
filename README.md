@@ -1,4 +1,4 @@
-# FundedPro - Professional Prop Trading Platform
+# Pro FundX - Professional Prop Trading Platform
 
 A complete, production-ready proprietary trading platform with real-time charting, risk management, and admin panel. Built to compete with FTMO, MyFundedFX, The5ers, E8 Funding.
 
@@ -94,14 +94,17 @@ npm run dev
 
 ```bash
 # 1. Create production env
-cp api/.env.example api/.env.production
-# Edit with production secrets
+cp api/.env.example .env
+# Edit .env with production secrets and your domain
 
 # 2. Build and start
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 # 3. Run migrations
-docker-compose exec api npx prisma migrate deploy
+docker compose exec api npx prisma migrate deploy
+
+# 4. Verify the stack
+docker compose ps
 ```
 
 ## Project Structure
@@ -220,7 +223,7 @@ PUT    /api/admin/rules/:accountSize/:phase
 
 ### Backend (api/.env)
 ```env
-DATABASE_URL=postgresql://user:pass@localhost:5432/fundedpro
+DATABASE_URL=postgresql://user:pass@localhost:5432/pro-fundx
 JWT_SECRET=your-256-bit-secret
 JWT_REFRESH_SECRET=your-256-bit-refresh-secret
 STRIPE_SECRET_KEY=sk_test_...

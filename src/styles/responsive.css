@@ -1,0 +1,405 @@
+/* ── Responsive Breakpoints ────────────────────────────────
+   1400px+  : desktop full
+   1200px   : collapse market watch
+   1024px   : collapse right panel
+   768px    : single column, card tables
+   480px    : full-width forms, big touch targets
+   360px    : minimal
+   ─────────────────────────────────────────────────────── */
+
+/* ── 1200px ─────────────────────────────────────────────── */
+@media (max-width: 1200px) {
+  .trade-market-watch {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 260px !important;
+    min-width: 260px !important;
+    height: 100vh;
+    z-index: 110;
+    transition: left 0.25s ease;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+    border-right: 1px solid #1e222d;
+  }
+  .with-market-watch .trade-market-watch {
+    left: 0;
+  }
+  .trade-mw-toggle {
+    display: flex !important;
+  }
+  .trade-mw-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 109;
+  }
+  .with-market-watch .trade-mw-overlay {
+    display: block;
+  }
+}
+
+/* ── 1024px ─────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .trade-right-panel {
+    position: fixed;
+    top: 0;
+    right: -100%;
+    width: min(90vw, 400px) !important;
+    height: 100vh;
+    z-index: 100;
+    transition: right 0.3s ease;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.5);
+  }
+  .trade-right-panel.open {
+    right: 0;
+  }
+  .trade-right-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 99;
+  }
+  .trade-right-overlay.open {
+    display: block;
+  }
+
+  /* Shrink intervals text */
+  .toolbar-group-label {
+    display: none;
+  }
+}
+
+/* ── 768px ──────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .trade-market-watch {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 320px;
+    left: -100%;
+  }
+  .with-market-watch .trade-market-watch {
+    left: 0;
+  }
+  .trade-layout {
+    flex-direction: column;
+    height: calc(100vh - 56px) !important;
+  }
+
+  .trade-chart-area {
+    flex: 1;
+    min-height: 0;
+  }
+  .trade-chart-container {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .trade-bottom-panel {
+    height: auto !important;
+    max-height: 45vh;
+    min-height: 120px;
+  }
+  .trade-bottom-content {
+    max-height: calc(45vh - 36px);
+    overflow: auto;
+  }
+
+  /* Replace grid tables with card-style rows */
+  .trade-pos-header {
+    display: none !important;
+  }
+  .trade-pos-row {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding: 10px 12px !important;
+    border-bottom: 1px solid #1e222d;
+    font-size: 12px;
+  }
+  .trade-pos-row > * {
+    flex: 1 1 auto;
+    min-width: 60px;
+  }
+  .trade-pos-row > *::before {
+    content: attr(data-label) ':' !important;
+    font-size: 9px;
+    font-weight: 500;
+    color: #787b86;
+    display: inline;
+    margin-right: 4px;
+  }
+  .trade-pos-row .trade-pos-action-btn,
+  .trade-pos-row .trade-pos-close {
+    min-width: 60px;
+  }
+
+  /* Interval buttons: scroll horizontally */
+  .toolbar-group {
+    flex-shrink: 0;
+  }
+
+  .trade-topbar-wrap .trade-intervals {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .trade-topbar-wrap {
+    flex-wrap: wrap;
+    gap: 4px !important;
+    padding: 4px 8px !important;
+    min-height: auto !important;
+  }
+
+  /* Hide text labels, show only icons in top bar */
+  .trade-mw-toggle span,
+  .trade-fullscreen-btn span {
+    display: none;
+  }
+}
+
+/* ── 600px ──────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .trade-topbar-wrap {
+    font-size: 11px;
+  }
+  .toolbar-btn {
+    padding: 3px 6px !important;
+    font-size: 11px !important;
+  }
+  .trade-symbol-wrap {
+    min-width: 0;
+  }
+  .trade-symbol-code {
+    font-size: 13px !important;
+  }
+
+  /* Auth pages */
+  .auth-container > div {
+    width: calc(100% - 32px) !important;
+    max-width: 400px !important;
+    padding: 24px 20px !important;
+  }
+
+  /* Dashboard */
+  .dash-cards {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── 600px name fields stacking ────────────────────────── */
+@media (max-width: 600px) {
+  .auth-name-row {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+}
+
+/* ── 480px ──────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .toolbar-btn {
+    padding: 3px 5px !important;
+    font-size: 10px !important;
+  }
+  .toolbar-divider {
+    margin: 0 2px;
+  }
+
+  .trade-intervals {
+    gap: 1px !important;
+  }
+
+  .chart-indicator-btn {
+    padding: 4px 6px !important;
+  }
+  .chart-indicator-btn span {
+    display: none;
+  }
+
+  /* Stack SL/TP inputs in order panel */
+  .trade-sl-tp-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .trade-sl-tp-row > * {
+    flex: none !important;
+    width: 100%;
+  }
+
+  /* Tables: even more compact */
+  .trade-pos-row {
+    font-size: 11px;
+    padding: 8px 10px !important;
+  }
+
+  /* Increase touch targets */
+  .trade-vol-btn,
+  .trade-copier-btn {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+  .trade-side-btn,
+  .trade-submit-btn {
+    min-height: 48px !important;
+    font-size: 16px !important;
+  }
+  .trade-vol-preset {
+    min-width: 44px !important;
+    min-height: 36px !important;
+    font-size: 13px !important;
+  }
+  .trade-order-type-btn {
+    min-height: 40px !important;
+    font-size: 13px !important;
+  }
+  .trade-field-input {
+    font-size: 16px !important; /* prevents iOS zoom on focus */
+    padding: 10px 8px !important;
+  }
+
+}
+
+/* ── 360px ──────────────────────────────────────────────── */
+@media (max-width: 360px) {
+  .trade-topbar-wrap {
+    gap: 2px !important;
+  }
+  .toolbar-btn {
+    padding: 2px 4px !important;
+    font-size: 9px !important;
+  }
+  .trade-symbol-code {
+    font-size: 12px !important;
+  }
+}
+
+/* ── Utility ────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+@media (min-width: 769px) {
+  .hide-desktop {
+    display: none !important;
+  }
+}
+
+/* ── Modal responsive ───────────────────────────────────── */
+@media (max-width: 480px) {
+  .trade-modal {
+    width: calc(100vw - 24px) !important;
+    max-width: 400px !important;
+    margin: 0 12px;
+  }
+  .trade-modal-content {
+    padding: 20px 16px !important;
+  }
+}
+
+/* ── Toast responsive ───────────────────────────────────── */
+@media (max-width: 480px) {
+  .toast-container {
+    left: 8px !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    max-width: none !important;
+  }
+}
+
+/* ── Notification dropdown responsive ───────────────────── */
+@media (max-width: 480px) {
+  .notif-dropdown {
+    width: calc(100vw - 16px) !important;
+    max-width: none !important;
+    left: 8px !important;
+    right: 8px !important;
+  }
+}
+
+/* ── Chart responsive ───────────────────────────────────── */
+@media (max-width: 768px) {
+  .chart-toolbar {
+    gap: 3px !important;
+  }
+  .chart-ohlcv-tooltip {
+    font-size: 10px !important;
+    min-width: 140px !important;
+    padding: 4px 8px !important;
+  }
+  .chart-tooltip-time {
+    font-size: 10px !important;
+  }
+  .chart-tooltip-row {
+    gap: 4px !important;
+    font-size: 10px !important;
+  }
+  .chart-tooltip-vol {
+    font-size: 9px !important;
+  }
+}
+@media (max-width: 480px) {
+  .chart-ohlcv-tooltip {
+    min-width: 120px !important;
+    padding: 3px 6px !important;
+    border-radius: 4px !important;
+  }
+  .chart-ohlcv-tooltip .chart-tooltip-time {
+    font-size: 9px !important;
+  }
+  .chart-ohlcv-tooltip .chart-tooltip-row {
+    font-size: 9px !important;
+    gap: 2px !important;
+  }
+  .chart-tooltip-val {
+    min-width: 36px !important;
+  }
+}
+
+/* ── Trade left panel shrink ────────────────────────────── */
+@media (max-width: 1024px) {
+  .trade-left-panel {
+    min-width: 0 !important;
+  }
+}
+
+/* ── Dashboard responsive ───────────────────────────────── */
+@media (max-width: 768px) {
+  .dash-header {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+  .dash-cards {
+    grid-template-columns: 1fr !important;
+  }
+  .dash-ticker {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .dash-ticker-inner {
+    gap: 16px !important;
+  }
+  .dash-empty {
+    padding: 40px 20px !important;
+  }
+}
+@media (max-width: 480px) {
+  .dash-page h1 {
+    font-size: 20px !important;
+  }
+  .dash-ticker {
+    padding: 8px 12px !important;
+  }
+  .dash-ticker-inner {
+    gap: 12px !important;
+    font-size: 12px !important;
+  }
+}
+
+/* ── Tables: horizontal scroll fallback ─────────────────── */
+@media (max-width: 1200px) {
+  .trade-table-wrap {
+    overflow-x: auto;
+  }
+}

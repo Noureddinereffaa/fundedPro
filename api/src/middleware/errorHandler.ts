@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express'
 import { ZodError } from 'zod'
 
+const isDev = process.env.NODE_ENV !== 'production'
+
 export class AppError extends Error {
   statusCode: number
   isOperational: boolean
@@ -9,13 +11,13 @@ export class AppError extends Error {
     super(message)
     this.statusCode = statusCode
     this.isOperational = true
-    Error.captureStackTrace(this, this.constructor)
+    if (isDev) Error.captureStackTrace(this, this.constructor)
   }
 }
 
 export function errorHandler(err: Error, req: Request, res: Response, next: NextFunction): void {
   if (err instanceof ZodError) {
-    const errors = err.errors.map(e => ({ field: e.path.join('.'), message: e.message }))
+    const errors = err.errors.map((e) => ({ field: e.path.join('.'), message: e.message }))
     res.status(400).json({ error: 'Validation failed', details: errors })
     return
   }
@@ -25,6 +27,12 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
     return
   }
 
-  console.error('Unhandled error:', err)
-  res.status(500).json({ error: 'Internal server error' })
+  // Log full error server-side
+  console.error('[ERROR]', err.message, isDev ? err.stack : '')
+
+  // Never leak stack trace in production
+  res.status(500).json({
+    error: 'Internal server error',
+    ...(isDev && { details: err.message, stack: err.stack }),
+  })
 }

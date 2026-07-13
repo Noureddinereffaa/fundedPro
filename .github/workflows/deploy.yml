@@ -1,0 +1,49 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+
+env:
+  NODE_VERSION: 20
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build & push Docker images
+        run: |
+          docker build -t pro-fundx-api:latest ./api
+          docker build -t pro-fundx-ws:latest -f Dockerfile.ws .
+          docker build -t pro-fundx-frontend:latest -f Dockerfile.frontend .
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd /opt/pro-fundx
+            git pull origin main
+            
+            # Build images locally
+            docker compose build
+            
+            # Run database migrations
+            docker compose run --rm api npx prisma migrate deploy
+            
+            # Recreate containers with new images
+            docker compose up -d --remove-orphans
+            
+            # Clean up old images
+            docker image prune -f
+            
+            # Verify health
+            sleep 10
+            docker compose ps

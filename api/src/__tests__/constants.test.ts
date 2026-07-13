@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { SYMBOLS, COMMISSION, SPREAD_MARKUP, ACCOUNT_SIZES, ACCOUNT_PRICES, DEFAULT_RULES, PROFIT_SPLIT } from '../utils/constants.js'
+import {
+  SYMBOLS,
+  COMMISSION,
+  SPREAD_MARKUP,
+  ACCOUNT_SIZES,
+  ACCOUNT_PRICES,
+  DEFAULT_RULES,
+  PROFIT_SPLIT,
+} from '../utils/constants.js'
 
 describe('ACCOUNT_SIZES', () => {
   it('has standard sizes', () => {
@@ -52,13 +60,13 @@ describe('DEFAULT_RULES', () => {
 
 describe('PROFIT_SPLIT', () => {
   it('is 80%', () => {
-    expect(PROFIT_SPLIT).toBe(0.80)
+    expect(PROFIT_SPLIT).toBe(0.8)
   })
 })
 
 describe('SYMBOLS', () => {
-  it('contains all major forex pairs', () => {
-    const majors = ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'NZDUSD', 'USDCHF']
+  it('contains major crypto pairs', () => {
+    const majors = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'BNBUSDT']
     for (const m of majors) {
       expect(SYMBOLS[m]).toBeDefined()
     }
@@ -70,23 +78,16 @@ describe('SYMBOLS', () => {
       expect(info.pipValue).toBeGreaterThan(0)
       expect(info.contractSize).toBeGreaterThan(0)
       expect(info.margin).toBeGreaterThan(0)
-      expect(['forex', 'metals', 'oil', 'indices', 'crypto']).toContain(info.category)
+      expect(['crypto', 'rwa']).toContain(info.category)
     }
   })
 
-  it('EURUSD has correct values', () => {
-    const eur = SYMBOLS['EURUSD']
-    expect(eur.digits).toBe(5)
-    expect(eur.pipValue).toBe(0.0001)
-    expect(eur.contractSize).toBe(100000)
-    expect(eur.category).toBe('forex')
-  })
-
-  it('XAUUSD has correct metal values', () => {
-    const xau = SYMBOLS['XAUUSD']
-    expect(xau.digits).toBe(2)
-    expect(xau.contractSize).toBe(100)
-    expect(xau.category).toBe('metals')
+  it('contains RWA symbols', () => {
+    const rwaSymbols = ['MKRUSDT', 'ONDOUSDT', 'PENDLEUSDT', 'CFGUSDT', 'POLYXUSDT']
+    for (const s of rwaSymbols) {
+      expect(SYMBOLS[s]).toBeDefined()
+      expect(SYMBOLS[s].category).toBe('rwa')
+    }
   })
 
   it('BTCUSDT has correct crypto values', () => {
@@ -96,24 +97,17 @@ describe('SYMBOLS', () => {
     expect(btc.category).toBe('crypto')
   })
 
-  it('SPX has correct index values', () => {
-    const spx = SYMBOLS['SPX']
-    expect(spx.digits).toBe(2)
-    expect(spx.contractSize).toBe(50)
-    expect(spx.category).toBe('indices')
-  })
-
-  it('USOIL has correct oil values', () => {
-    const oil = SYMBOLS['USOIL']
-    expect(oil.digits).toBe(2)
-    expect(oil.contractSize).toBe(1000)
-    expect(oil.category).toBe('oil')
+  it('ONDOUSDT has correct rwa values', () => {
+    const ondo = SYMBOLS['ONDOUSDT']
+    expect(ondo.digits).toBe(4)
+    expect(ondo.contractSize).toBe(1)
+    expect(ondo.category).toBe('rwa')
   })
 })
 
 describe('COMMISSION', () => {
   it('has rates for all categories', () => {
-    const categories = ['forex', 'metals', 'crypto', 'indices', 'oil']
+    const categories = ['crypto', 'rwa']
     for (const cat of categories) {
       expect(COMMISSION[cat]).toBeDefined()
       expect(COMMISSION[cat]).toBeGreaterThanOrEqual(0)
@@ -124,14 +118,14 @@ describe('COMMISSION', () => {
     expect(COMMISSION.crypto).toBe(0)
   })
 
-  it('forex has 3.5 per lot', () => {
-    expect(COMMISSION.forex).toBe(3.5)
+  it('rwa has zero commission', () => {
+    expect(COMMISSION.rwa).toBe(0)
   })
 })
 
 describe('SPREAD_MARKUP', () => {
   it('has markup for all categories', () => {
-    const categories = ['forex', 'metals', 'crypto', 'indices', 'oil']
+    const categories = ['crypto', 'rwa']
     for (const cat of categories) {
       expect(SPREAD_MARKUP[cat]).toBeDefined()
     }
@@ -139,5 +133,9 @@ describe('SPREAD_MARKUP', () => {
 
   it('crypto has zero spread markup', () => {
     expect(SPREAD_MARKUP.crypto).toBe(0)
+  })
+
+  it('rwa has zero spread markup', () => {
+    expect(SPREAD_MARKUP.rwa).toBe(0)
   })
 })

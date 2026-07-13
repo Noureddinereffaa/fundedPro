@@ -1,24 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
+import type { User, AuthContextType } from '../../shared/types'
 import { api, authApi } from '../utils/api.ts'
-
-interface User {
-  id: string
-  email: string
-  firstName?: string
-  lastName?: string
-  role: string
-  kycStatus?: string
-  createdAt?: string
-}
-
-interface AuthContextType {
-  user: User | null
-  loading: boolean
-  login: (email: string, password: string) => Promise<void>
-  register: (data: { email: string; password: string; firstName?: string; lastName?: string }) => Promise<void>
-  logout: () => Promise<void>
-}
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType)
 
@@ -30,8 +13,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem('accessToken')
     if (token) {
       api.setToken(token)
-      authApi.getProfile()
-        .then(data => setUser(data))
+      authApi
+        .getProfile()
+        .then((data) => setUser(data))
         .catch(() => {
           localStorage.removeItem('accessToken')
           api.setToken(null)
@@ -49,7 +33,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(result.user)
   }
 
-  const register = async (data: { email: string; password: string; firstName?: string; lastName?: string }) => {
+  const register = async (data: {
+    email: string
+    password: string
+    firstName?: string
+    lastName?: string
+  }) => {
     const result = await authApi.register(data)
     localStorage.setItem('accessToken', result.accessToken)
     api.setToken(result.accessToken)
@@ -64,9 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={{ user, loading, login, register, logout }}>{children}</AuthContext.Provider>
   )
 }
 

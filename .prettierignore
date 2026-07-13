@@ -1,0 +1,14 @@
+node_modules/
+dist/
+api/node_modules/
+api/dist/
+server/node_modules/
+coverage/
+logs/
+*.log
+.DS_Store
+*.md
+*.sql
+ssl/
+package-lock.json
+pnpm-lock.yaml

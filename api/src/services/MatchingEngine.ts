@@ -1,83 +1,136 @@
 import { prisma } from '../index.js'
 import { TradingService } from './trading.js'
 import { calculatePnL } from '../utils/helpers.js'
+import { PriceSnapshotClient } from '../utils/priceClient.js'
+import { AlertService, NotificationService } from './alerts.js'
 
-async function fetchLivePrices(): Promise<Record<string, { price: number; change: number }>> {
-  try {
-    const res = await fetch('http://localhost:3002/prices', { signal: AbortSignal.timeout(2000) })
-    if (res.ok) {
-      return await res.json() as Record<string, { price: number; change: number }>
-    }
-  } catch (err) {
-    // console.warn('[MatchingEngine] Failed to fetch prices from WS server', err)
+const priceClient = new PriceSnapshotClient()
+
+interface FetchPricesResult {
+  prices: Record<string, { price: number; change: number }>
+  source: 'primary' | 'fallback' | 'empty'
+}
+
+/**
+ * Fetch live prices with resilience and monitoring
+ * Falls back gracefully when price source is unavailable
+ */
+async function fetchLivePrices(
+  injectedPrices?: Record<string, { price: number; change: number }>,
+): Promise<FetchPricesResult> {
+  // Use injected prices if provided (for testing)
+  if (injectedPrices) {
+    return { prices: injectedPrices, source: 'primary' }
   }
-  return {}
+
+  try {
+    const prices = await priceClient.getPrices()
+    const source = Object.keys(prices).length > 0 ? 'primary' : 'empty'
+    return { prices, source }
+  } catch (err) {
+    const metrics = priceClient.getFailureMetrics()
+    console.error(
+      `[MatchingEngine] Failed to fetch prices from WS server. Failures: ${metrics.failureCount}`,
+      err instanceof Error ? err.message : 'unknown error',
+    )
+    return { prices: {}, source: 'fallback' }
+  }
 }
 
 export class MatchingEngine {
   private bestPrices = new Map<string, { high: number; low: number }>()
   private trading: TradingService
+  private processing = false
 
   constructor() {
     this.trading = new TradingService()
   }
 
   // 1. Process Pending Orders (Limit / Stop)
-  async processOrders() {
-    const orders = await prisma.order.findMany({
-      where: { status: 'pending' },
-      include: { account: true },
-    })
-    if (orders.length === 0) return
+  async processOrders(injectedPrices?: Record<string, { price: number; change: number }>) {
+    if (this.processing) return
+    this.processing = true
+    try {
+      const orders = await prisma.order.findMany({
+        where: { status: 'pending' },
+        include: { account: { include: { user: { select: { id: true, email: true } } } } },
+      })
+      if (orders.length === 0) return
 
-    const prices = await fetchLivePrices()
-
-    for (const order of orders) {
-      const priceData = prices[order.symbol]
-      if (!priceData || priceData.price <= 0) continue
-
-      const currentPrice = priceData.price
-      const orderPrice = Number(order.price)
-      let triggered = false
-
-      if (order.type === 'limit') {
-        if (order.side === 'buy' && currentPrice <= orderPrice) triggered = true
-        if (order.side === 'sell' && currentPrice >= orderPrice) triggered = true
-      } else if (order.type === 'stop') {
-        if (order.side === 'buy' && currentPrice >= orderPrice) triggered = true
-        if (order.side === 'sell' && currentPrice <= orderPrice) triggered = true
+      const result = await fetchLivePrices(injectedPrices)
+      if (result.prices && Object.keys(result.prices).length === 0) {
+        console.warn(`[MatchingEngine] No prices available for order matching`)
+        return
       }
 
-      if (!triggered) continue
+      let matchedCount = 0
 
-      try {
-        await this.trading.placeOrder(order.accountId, {
-          symbol: order.symbol,
-          type: 'market',
-          side: order.side,
-          volume: Number(order.volume),
-          price: currentPrice,
-          stopLoss: order.stopLoss ? Number(order.stopLoss) : undefined,
-          takeProfit: order.takeProfit ? Number(order.takeProfit) : undefined,
-          trailingStop: order.trailingStop ? Number(order.trailingStop) : undefined,
-          breakEven: order.breakEven,
-        })
+      for (const order of orders) {
+        const priceData = result.prices[order.symbol]
+        if (!priceData || priceData.price <= 0) continue
 
-        await prisma.order.update({
-          where: { id: order.id },
-          data: { status: 'filled' },
-        })
+        const currentPrice = priceData.price
+        const orderPrice = Number(order.price)
+        let triggered = false
 
-        console.log(`[MatchingEngine] Filled ${order.type} ${order.side} ${order.symbol} vol=${order.volume} @ ${currentPrice}`)
-      } catch (err: any) {
-        await prisma.order.update({
-          where: { id: order.id },
-          data: {
-            status: 'failed',
-            errorMessage: err.message || 'Matching engine execution failed',
-          },
-        })
+        if (order.type === 'limit') {
+          if (order.side === 'buy' && currentPrice <= orderPrice) triggered = true
+          if (order.side === 'sell' && currentPrice >= orderPrice) triggered = true
+        } else if (order.type === 'stop') {
+          if (order.side === 'buy' && currentPrice >= orderPrice) triggered = true
+          if (order.side === 'sell' && currentPrice <= orderPrice) triggered = true
+        }
+
+        if (!triggered) continue
+
+        try {
+          await this.trading.placeOrder(order.accountId, {
+            symbol: order.symbol,
+            type: 'market',
+            side: order.side,
+            volume: Number(order.volume),
+            price: currentPrice,
+            stopLoss: order.stopLoss ? Number(order.stopLoss) : undefined,
+            takeProfit: order.takeProfit ? Number(order.takeProfit) : undefined,
+            trailingStop: order.trailingStop ? Number(order.trailingStop) : undefined,
+            breakEven: order.breakEven,
+          })
+
+          await prisma.order.update({
+            where: { id: order.id },
+            data: { status: 'filled' },
+          })
+
+          matchedCount += 1
+          console.log(
+            `[MatchingEngine] Filled ${order.type} ${order.side} ${order.symbol} vol=${order.volume} @ ${currentPrice}`,
+          )
+
+          try {
+            await NotificationService.create({
+              userId: order.account.userId,
+              type: 'order_filled',
+              title: `📈 ${order.type.toUpperCase()} ${order.side.toUpperCase()} ${order.symbol} Filled`,
+              message: `Volume: ${order.volume} @ $${currentPrice.toFixed(5)}`,
+              data: { symbol: order.symbol, price: currentPrice, volume: order.volume, side: order.side, type: order.type },
+              link: `/trade/${order.accountId}`,
+            })
+            import('./email.js').then(({ EmailService }) => {
+              new EmailService().sendOrderFilled(order.account.user.email, order.symbol, order.side, order.type, Number(order.volume), currentPrice).catch(() => {})
+            }).catch(() => {})
+          } catch { /* non-blocking */ }
+        } catch (err: any) {
+          await prisma.order.update({
+            where: { id: order.id },
+            data: {
+              status: 'failed',
+              errorMessage: err.message || 'Matching engine execution failed',
+            },
+          })
+        }
       }
+    } finally {
+      this.processing = false
     }
   }
 
@@ -85,17 +138,53 @@ export class MatchingEngine {
   async processSLTP() {
     const positions = await prisma.position.findMany({
       where: { status: 'open' },
+      include: { account: { include: { user: { select: { id: true, email: true } } } } },
     })
     if (positions.length === 0) return
 
-    const prices = await fetchLivePrices()
+    const result = await fetchLivePrices()
+    const prices = result.prices
+
+    if (Object.keys(prices).length === 0) {
+      console.warn(`[MatchingEngine] No prices available for SL/TP processing`)
+      return
+    }
+
+    let slhitCount = 0
+    let tphitCount = 0
 
     for (const position of positions) {
       const priceData = prices[position.symbol]
       if (!priceData || priceData.price <= 0) continue
 
       const currentPrice = priceData.price
-      const floatingPnl = calculatePnL(position.side, Number(position.openPrice), currentPrice, Number(position.volume), position.symbol)
+
+      let quoteToUsdRate = 1
+      if (
+        !position.symbol.endsWith('USD') &&
+        !position.symbol.endsWith('USDT') &&
+        !position.symbol.startsWith('USD')
+      ) {
+        const quote = position.symbol.substring(3)
+        if (quote && quote.length === 3) {
+          const directSymbol = `${quote}USD`
+          const inverseSymbol = `USD${quote}`
+          if (prices[directSymbol]) {
+            quoteToUsdRate = prices[directSymbol].price
+          } else if (prices[inverseSymbol]) {
+            quoteToUsdRate = 1 / prices[inverseSymbol].price
+          }
+        }
+      }
+
+      const floatingPnl = calculatePnL(
+        position.side,
+        Number(position.openPrice),
+        currentPrice,
+        Number(position.volume),
+        position.symbol,
+        quoteToUsdRate,
+      )
       const sl = position.stopLoss ? Number(position.stopLoss) : null
       const tp = position.takeProfit ? Number(position.takeProfit) : null
 
@@ -103,41 +192,81 @@ export class MatchingEngine {
 
       if (position.side === 'buy') {
         if (sl && currentPrice <= sl) closeReason = 'stop_loss'
-        if (tp && currentPrice >= tp) closeReason = 'take_profit'
+        else if (tp && currentPrice >= tp) closeReason = 'take_profit'
       } else {
         if (sl && currentPrice >= sl) closeReason = 'stop_loss'
-        if (tp && currentPrice <= tp) closeReason = 'take_profit'
+        else if (tp && currentPrice <= tp) closeReason = 'take_profit'
       }
 
       if (closeReason) {
         try {
           // Execute close via TradingService so balance/trade history are updated correctly
           await this.trading.closePosition(position.id, position.accountId, undefined, currentPrice)
+
+          if (closeReason === 'stop_loss') {
+            slhitCount += 1
+          } else {
+            tphitCount += 1
+          }
+
           console.log(`[MatchingEngine] Hit ${closeReason} for ${position.symbol} @ ${currentPrice}`)
-          
+
           // Also manually update the trade record with the correct closeReason if TradingService defaults to 'manual'
           await prisma.trade.updateMany({
             where: { positionId: position.id },
             data: { closeReason },
           })
+
+          // Create notification + email for SL/TP hit
+          try {
+            const account = position.account
+            if (account) {
+              const pnl = calculatePnL(
+                position.side,
+                Number(position.openPrice),
+                currentPrice,
+                Number(position.volume),
+                position.symbol,
+              )
+              await NotificationService.create({
+                userId: account.user.id,
+                type: closeReason === 'stop_loss' ? 'stop_loss' : 'take_profit',
+                title: `${closeReason === 'stop_loss' ? '🔴' : '🟢'} ${closeReason === 'stop_loss' ? 'Stop Loss' : 'Take Profit'} ${position.symbol}`,
+                message: `${position.side.toUpperCase()} ${position.symbol} closed at $${currentPrice.toFixed(5)} (${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)})`,
+                data: { symbol: position.symbol, price: currentPrice, pnl, side: position.side },
+                link: `/trade/${position.accountId}`,
+              })
+              import('./email.js').then(({ EmailService }) => {
+                new EmailService().sendSLTPHit(account.user.email, position.symbol, position.side, closeReason, currentPrice, pnl).catch(() => {})
+              }).catch(() => {})
+            }
+          } catch { /* non-blocking */ }
         } catch (err: any) {
           console.error(`[MatchingEngine] SL/TP close failed for ${position.id}: ${err.message}`)
         }
       } else {
         // Update floating PnL & current price live
-        await prisma.position.update({
-          where: { id: position.id },
-          data: {
-            currentPrice,
-            profit: floatingPnl,
-          },
-        })
+        try {
+          await prisma.position.update({
+            where: { id: position.id },
+            data: {
+              currentPrice,
+              profit: floatingPnl,
+            },
+          })
+        } catch (err: any) {
+          console.error(`[MatchingEngine] Failed to update position ${position.id}: ${err.message}`)
+        }
       }
+    }
+
+    if (slhitCount > 0 || tphitCount > 0) {
+      console.info(`[MatchingEngine] SL/TP processing: ${slhitCount} SL hits, ${tphitCount} TP hits`)
     }
   }
 
   // 3. Process Trailing Stops
-  async processTrailingStops() {
+  async processTrailingStops(injectedPrices?: Record<string, { price: number; change: number }>) {
     const positions = await prisma.position.findMany({
       where: {
         status: 'open',
@@ -146,7 +275,10 @@ export class MatchingEngine {
     })
     if (positions.length === 0) return
 
-    const prices = await fetchLivePrices()
+    const result = await fetchLivePrices(injectedPrices)
+    const prices = result.prices
+
+    let trailedCount = 0
 
     for (const position of positions) {
       const priceData = prices[position.symbol]
@@ -176,16 +308,31 @@ export class MatchingEngine {
 
       if (newSL !== null && newSL > 0) {
         const roundedSL = Number(newSL.toFixed(6))
-        await prisma.position.update({
-          where: { id: posId },
-          data: { stopLoss: roundedSL },
-        })
+        try {
+          await prisma.position.update({
+            where: { id: posId },
+            data: { stopLoss: roundedSL },
+          })
+          trailedCount += 1
+        } catch (err: any) {
+          console.error(`[MatchingEngine] Failed to update trailing stop for ${posId}: ${err.message}`)
+        }
       }
+    }
+
+    if (trailedCount > 0) {
+      console.debug(`[MatchingEngine] Updated ${trailedCount} trailing stops`)
+    }
+
+    // Clean up stale bestPrices entries for closed positions
+    const openIds = new Set(positions.map((p) => p.id))
+    for (const key of this.bestPrices.keys()) {
+      if (!openIds.has(key)) this.bestPrices.delete(key)
     }
   }
 
   // 4. Process Break Even
-  async processBreakEven() {
+  async processBreakEven(injectedPrices?: Record<string, { price: number; change: number }>) {
     const positions = await prisma.position.findMany({
       where: {
         status: 'open',
@@ -194,7 +341,15 @@ export class MatchingEngine {
     })
     if (positions.length === 0) return
 
-    const prices = await fetchLivePrices()
+    const result = await fetchLivePrices(injectedPrices)
+    const prices = result.prices
+
+    if (Object.keys(prices).length === 0) {
+      console.warn(`[MatchingEngine] No prices available for break-even processing`)
+      return
+    }
+
+    let movedCount = 0
 
     for (const position of positions) {
       const priceData = prices[position.symbol]
@@ -211,14 +366,23 @@ export class MatchingEngine {
       else if (position.side === 'sell' && currentPrice <= openPrice - threshold) shouldMove = true
 
       if (shouldMove && existingSL !== openPrice) {
-        await prisma.position.update({
-          where: { id: position.id },
-          data: {
-            stopLoss: openPrice,
-            breakEven: false,
-          },
-        })
+        try {
+          await prisma.position.update({
+            where: { id: position.id },
+            data: {
+              stopLoss: openPrice,
+              breakEven: false,
+            },
+          })
+          movedCount += 1
+        } catch (err: any) {
+          console.error(`[MatchingEngine] Failed to update break-even SL for ${position.id}: ${err.message}`)
+        }
       }
+    }
+
+    if (movedCount > 0) {
+      console.debug(`[MatchingEngine] Updated ${movedCount} break-even stop losses`)
     }
   }
 
@@ -226,38 +390,96 @@ export class MatchingEngine {
   async processSwap() {
     const positions = await prisma.position.findMany({
       where: { status: 'open' },
-      include: { account: true }
+      include: { account: true },
     })
-    
+
     if (positions.length === 0) return
 
     const { SWAP_RATES, SYMBOLS } = await import('../utils/constants.js')
-    
+
+    const isWednesday = new Date().getUTCDay() === 3
+
     for (const position of positions) {
-      const category = SYMBOLS[position.symbol]?.category || 'forex'
+      const category = SYMBOLS[position.symbol]?.category || 'crypto'
       const rates = SWAP_RATES[category] || { long: 0, short: 0 }
-      const swapRate = position.side === 'buy' ? rates.long : rates.short
-      
+      let swapRate = position.side === 'buy' ? rates.long : rates.short
+
+      // Triple swap on Wednesday for Forex and Metals
+      if (isWednesday && (category === 'forex' || category === 'metals' || category === 'indices' || category === 'stocks')) {
+        swapRate *= 3
+      }
+
       // Calculate swap cost based on volume
       // simple calculation: swap = volume * swapRate
       const swapCost = Number(position.volume) * swapRate
-      
+
       if (swapCost !== 0) {
         const newSwap = Number(position.swap) + swapCost
         await prisma.position.update({
           where: { id: position.id },
-          data: { swap: newSwap }
+          data: { swap: newSwap },
         })
-        
-        // deduct from balance
-        const newBalance = Number(position.account.balance) + swapCost
+
         await prisma.account.update({
           where: { id: position.accountId },
-          data: { balance: newBalance }
+          data: { balance: { increment: swapCost } },
         })
       }
     }
     console.log('[MatchingEngine] Swap processed for open positions')
   }
-}
 
+  async processAlerts() {
+    const alerts = await AlertService.getActiveAlerts()
+    if (alerts.length === 0) return
+
+    const symbols = [...new Set(alerts.map((a) => a.symbol))]
+    const prices: Record<string, number> = {}
+
+    try {
+      const allPrices = await priceClient.getPrices()
+      for (const sym of symbols) {
+        if (allPrices[sym] && allPrices[sym].price > 0) {
+          prices[sym] = allPrices[sym].price
+        }
+      }
+    } catch {
+      // Fallback: try individual fetches
+      for (const sym of symbols) {
+        try {
+          const priceData = await priceClient.getSinglePrice(sym)
+          if (priceData?.price && priceData.price > 0) prices[sym] = priceData.price
+        } catch { /* skip */ }
+      }
+    }
+
+    if (Object.keys(prices).length === 0) return
+
+    let triggeredCount = 0
+    for (const alert of alerts) {
+      const currentPrice = prices[alert.symbol]
+      if (currentPrice === undefined) continue
+
+      const alertPrice = Number(alert.price)
+      let hit = false
+      if (alert.condition === 'above' && currentPrice >= alertPrice) hit = true
+      if (alert.condition === 'below' && currentPrice <= alertPrice) hit = true
+      if (!hit) continue
+
+      await AlertService.trigger(alert.id)
+      await NotificationService.create({
+        userId: alert.userId,
+        type: 'alert_triggered',
+        title: `Price Alert: ${alert.symbol} ${alert.condition === 'above' ? 'above' : 'below'} ${alertPrice}`,
+        message: alert.message || undefined,
+        data: { symbol: alert.symbol, price: currentPrice, alertPrice, condition: alert.condition },
+        link: `/trade/${alert.userId}`,
+      })
+
+      triggeredCount++
+    }
+    if (triggeredCount > 0) {
+      console.log(`[MatchingEngine] Alerts: triggered ${triggeredCount} alerts`)
+    }
+  }
+}
