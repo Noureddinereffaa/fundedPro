@@ -1,6 +1,6 @@
-import { MarketDataProvider } from './provider'
-import { ProviderName, ProviderConfig, MarketType } from './types'
-import { logger } from '../utils/logger'
+import { MarketDataProvider } from './provider.js'
+import { ProviderName, ProviderConfig, MarketType } from './types.js'
+import { logger } from '../utils/logger.js'
 
 type ProviderConstructor = new (config: ProviderConfig) => MarketDataProvider
 

@@ -1,10 +1,10 @@
-import { MarketDataProvider } from '../provider'
+import { MarketDataProvider } from '../provider.js'
 import {
   Ticker, Candle, OrderBook, SymbolDefinition,
   ProviderCapabilities, ProviderConfig,
   MarketType, Resolution, ProviderName,
-} from '../types'
-import { MarketDataError, ProviderNotConnectedError } from '../errors'
+} from '../types.js'
+import { MarketDataError, ProviderNotConnectedError } from '../errors.js'
 
 export class StooqProvider implements MarketDataProvider {
   readonly name = ProviderName.STOOQ

@@ -1,11 +1,11 @@
-import { MarketDataProvider } from '../provider'
+import { MarketDataProvider } from '../provider.js'
 import {
   Ticker, Candle, OrderBook, SymbolDefinition,
   ProviderCapabilities, ProviderConfig,
   MarketType, Resolution, ProviderName, RESOLUTION_SECONDS,
-} from '../types'
-import { MarketDataError, ProviderNotConnectedError } from '../errors'
-import { logger } from '../../utils/logger'
+} from '../types.js'
+import { MarketDataError, ProviderNotConnectedError } from '../errors.js'
+import { logger } from '../../utils/logger.js'
 
 export class YahooFinanceProvider implements MarketDataProvider {
   readonly name = ProviderName.YAHOO

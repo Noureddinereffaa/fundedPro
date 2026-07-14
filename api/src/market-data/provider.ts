@@ -2,7 +2,7 @@ import {
   Ticker, Candle, OrderBook, FundingRate, OpenInterest,
   SymbolDefinition, ProviderCapabilities, ProviderConfig,
   MarketType, Resolution, ProviderName,
-} from './types'
+} from './types.js'
 
 export interface MarketDataProvider {
   readonly name: ProviderName

@@ -1,12 +1,12 @@
 import * as ccxt from 'ccxt'
-import { MarketDataProvider } from '../provider'
+import { MarketDataProvider } from '../provider.js'
 import {
   Ticker, Candle, OrderBook, FundingRate, OpenInterest,
   SymbolDefinition, ProviderCapabilities, ProviderConfig,
   MarketType, Resolution, ProviderName,
-} from '../types'
-import { MarketDataError, ProviderNotConnectedError } from '../errors'
-import { logger } from '../../utils/logger'
+} from '../types.js'
+import { MarketDataError, ProviderNotConnectedError } from '../errors.js'
+import { logger } from '../../utils/logger.js'
 
 const CCXT_INTERVAL_MAP: Partial<Record<Resolution, string>> = {
   [Resolution.M1]: '1m',

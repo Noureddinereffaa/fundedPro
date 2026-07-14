@@ -1,6 +1,6 @@
 import {
   SymbolDefinition, MarketType, ProviderName, SearchResult,
-} from './types'
+} from './types.js'
 
 export class SymbolRegistry {
   private symbols: Map<string, SymbolDefinition>

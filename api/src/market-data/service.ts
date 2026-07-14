@@ -2,14 +2,14 @@ import {
   Ticker, Candle, OrderBook, Subscription, ProviderConfig,
   MarketType, Resolution, ProviderName, DEFAULT_PROVIDER_PRIORITY,
   SymbolDefinition, SearchResult,
-} from './types'
-import { MarketDataProvider } from './provider'
-import { providerFactory } from './factory'
-import { symbolRegistry } from './registry'
-import { MarketDataCache } from './cache'
-import { MarketDataError, AllProvidersFailedError, ProviderNotConnectedError } from './errors'
-import { marketDataPublisher } from './redis-pubsub'
-import { logger } from '../utils/logger'
+} from './types.js'
+import { MarketDataProvider } from './provider.js'
+import { providerFactory } from './factory.js'
+import { symbolRegistry } from './registry.js'
+import { MarketDataCache } from './cache.js'
+import { MarketDataError, AllProvidersFailedError, ProviderNotConnectedError } from './errors.js'
+import { marketDataPublisher } from './redis-pubsub.js'
+import { logger } from '../utils/logger.js'
 
 interface SubscriptionManager {
   ticker: Map<string, Set<(ticker: Ticker) => void>>

@@ -1,4 +1,4 @@
-import { ProviderName } from './types'
+import { ProviderName } from './types.js'
 
 export class MarketDataError extends Error {
   constructor(
