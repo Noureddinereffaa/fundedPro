@@ -1,15 +1,18 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { PaymentService } from '../services/payment.js'
+import { NowPaymentsService } from '../services/nowpayments.js'
 import { authenticate } from '../middleware/auth.js'
 import { AuthRequest } from '../types/index.js'
 import { AppError } from '../middleware/errorHandler.js'
 import { ACCOUNT_PRICES, ACCOUNT_SIZES } from '../utils/constants.js'
+import { config } from '../config/index.js'
 
 const checkoutSchema = z.object({
   accountSize: z.number().positive(),
   accountType: z.enum(['evaluation', 'evaluation_1', 'funded']).transform((v) => v === 'evaluation' ? 'evaluation_1' : v),
   promoCode: z.string().optional(),
+  method: z.enum(['crypto', 'nowpayments']).optional().default('crypto'),
 })
 
 const submitTxSchema = z.object({
@@ -33,9 +36,19 @@ router.get('/prices', (_req, res) => {
 
 router.post('/checkout', authenticate, async (req: AuthRequest, res) => {
   try {
-    const { accountSize, accountType, promoCode } = checkoutSchema.parse(req.body)
-    const result = await paymentService.createCheckout(req.user!.id, accountSize, accountType, promoCode)
-    res.json(result)
+    const { accountSize, accountType, promoCode, method } = checkoutSchema.parse(req.body)
+
+    if (method === 'nowpayments' && config.NOWPAYMENTS_API_KEY) {
+      // NOWPayments automated checkout
+      const payment = await paymentService.createCheckout(req.user!.id, accountSize, accountType, promoCode, 'nowpayments')
+      const nowPaymentsService = new NowPaymentsService()
+      const invoice = await nowPaymentsService.createInvoice(payment.id, payment.amount, req.user!.id)
+      res.json({ ...payment, invoiceUrl: invoice.invoice_url, method: 'nowpayments' })
+    } else {
+      // Manual crypto wallet checkout
+      const result = await paymentService.createCheckout(req.user!.id, accountSize, accountType, promoCode, 'crypto')
+      res.json(result)
+    }
   } catch (error: any) {
     if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors[0].message })
     res.status(error.statusCode || 500).json({ error: error.message })

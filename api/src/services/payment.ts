@@ -16,7 +16,7 @@ function generateTxId() {
 }
 
 export class PaymentService {
-  async createCheckout(userId: string, accountSize: number, accountType: string, promoCode?: string) {
+  async createCheckout(userId: string, accountSize: number, accountType: string, promoCode?: string, method: string = 'crypto') {
     const { ACCOUNT_PRICES } = await import('../utils/constants.js')
     const pricing = ACCOUNT_PRICES[accountSize as keyof typeof ACCOUNT_PRICES]
     if (!pricing) throw new AppError('Invalid account size', 400)
@@ -42,25 +42,26 @@ export class PaymentService {
     }
 
     const txId = generateTxId()
-    await prisma.payment.create({
+    const payment = await prisma.payment.create({
       data: {
         userId,
         amount,
         currency: 'USD',
-        method: 'crypto',
-        walletAddress: CRYPTO_WALLETS.BTC,
-        network: 'BTC',
+        method,
+        walletAddress: method === 'nowpayments' ? null : CRYPTO_WALLETS.BTC,
+        network: method === 'nowpayments' ? null : 'BTC',
         status: 'pending',
-        metadata: { txId, accountSize, accountType, promoCode, discount, createdAt: new Date().toISOString() },
+        metadata: { txId, accountSize, accountType, promoCode, discount, orderId: txId, createdAt: new Date().toISOString() },
       },
     })
 
     return {
+      id: payment.id,
       txId,
       amount,
-      walletAddress: CRYPTO_WALLETS.BTC,
-      network: 'BTC',
-      networks: [
+      walletAddress: method === 'nowpayments' ? null : CRYPTO_WALLETS.BTC,
+      network: method === 'nowpayments' ? null : 'BTC',
+      networks: method === 'nowpayments' ? [] : [
         { name: 'BTC', address: CRYPTO_WALLETS.BTC, label: 'Bitcoin' },
         { name: 'ETH', address: CRYPTO_WALLETS.ETH, label: 'Ethereum (ERC-20)' },
         { name: 'USDT-TRC20', address: CRYPTO_WALLETS['USDT-TRC20'], label: 'Tether (TRC-20)' },

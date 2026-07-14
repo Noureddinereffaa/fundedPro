@@ -29,6 +29,7 @@ import { localeMiddleware } from './middleware/localeMiddleware.js'
 import contactRoutes from './routes/contact.js'
 import settingsRoutes from './routes/settings.js'
 import badgeRoutes from './routes/badges.js'
+import paymentWebhookRoutes from './routes/payment-webhook.js'
 
 // Prisma client
 export const prisma = new PrismaClient()
@@ -110,6 +111,7 @@ app.use('/api/leaderboard', generalLimiter, leaderboardRoutes)
 app.use('/api/contact', generalLimiter, contactRoutes)
 app.use('/api/settings', generalLimiter, settingsRoutes)
 app.use('/api/badges', generalLimiter, badgeRoutes)
+app.use('/api/payments', paymentWebhookRoutes)
 
 // Auto-translation webhook
 app.use('/api', generalLimiter, translateRoutes)
@@ -194,6 +196,20 @@ async function start() {
       }
     }, 30 * 60 * 1000)
     console.log('Snapshot scheduler started (30min interval)')
+
+    // Start NOWPayments polling (every 5 minutes)
+    const { NowPaymentsService } = await import('./services/nowpayments.js')
+    const nowPaymentsService = new NowPaymentsService()
+    if (config.NOWPAYMENTS_API_KEY) {
+      setInterval(async () => {
+        try {
+          await nowPaymentsService.pollPendingPayments()
+        } catch (e) {
+          console.error('[BackgroundTask] NOWPayments poll error', e)
+        }
+      }, 5 * 60 * 1000)
+      console.log('NOWPayments poller started (5min interval)')
+    }
 
     app.listen(PORT, () => {
       console.log(`API server running on port ${PORT}`)

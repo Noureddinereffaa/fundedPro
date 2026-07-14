@@ -21,6 +21,7 @@ const envSchema = z.object({
   WS_SERVER_URL: z.string().optional().default(process.env.WS_SERVER_URL || 'http://localhost:3002'),
   SERVER_TIMEZONE_OFFSET: z.coerce.number().default(3),
   SENTRY_DSN: z.string().optional(),
+  NOWPAYMENTS_API_KEY: z.string().optional(),
 })
 
 const env = envSchema.safeParse(process.env)
