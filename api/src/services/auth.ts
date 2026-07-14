@@ -13,6 +13,13 @@ function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex')
 }
 
+export interface LoginResult {
+  user: { id: string; email: string; firstName: string | null; lastName: string | null; role: string }
+  accessToken?: string
+  refreshToken?: string
+  requiresTwoFactor?: boolean
+}
+
 export class AuthService {
   async register(email: string, password: string, firstName?: string, lastName?: string) {
     const existing = await prisma.user.findUnique({ where: { email } })
@@ -39,7 +46,7 @@ export class AuthService {
   }
   // ... keep the rest of the methods unchanged
 
-  async login(email: string, password: string, userAgent?: string, ip?: string) {
+  async login(email: string, password: string, userAgent?: string, ip?: string, totpCode?: string): Promise<LoginResult> {
     const user = await prisma.user.findUnique({ where: { email } })
     if (!user) throw new AppError('Invalid email or password', 401)
 
@@ -66,24 +73,40 @@ export class AuthService {
       throw new AppError('Invalid email or password', 401)
     }
 
-    // Reset lockout on successful login
+    // Password is valid — reset lockout
     await prisma.user.update({
       where: { id: user.id },
       data: { loginAttempts: 0, lockUntil: null },
     })
 
+    const userInfo = {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+    }
+
+    // 2FA check: if enabled, require TOTP code before issuing tokens
+    if (user.twoFactorEnabled) {
+      if (!totpCode) {
+        return { user: userInfo, requiresTwoFactor: true }
+      }
+      // Verify TOTP code
+      const { verify: verifyOtp } = await import('otplib')
+      const result = await verifyOtp({ token: totpCode, secret: user.twoFactorSecret! })
+      if (!result.valid) {
+        throw new AppError('Invalid two-factor code', 401)
+      }
+    }
+
     const tokens = generateTokens({ id: user.id, email: user.email, role: user.role })
     await this.saveRefreshToken(user.id, tokens.refreshToken, userAgent, ip)
 
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-      },
-      ...tokens,
+      user: userInfo,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
     }
   }
 
@@ -121,6 +144,7 @@ export class AuthService {
         avatar: true,
         kycStatus: true,
         role: true,
+        twoFactorEnabled: true,
         createdAt: true,
       },
     })

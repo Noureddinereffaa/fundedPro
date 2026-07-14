@@ -1,8 +1,7 @@
-import { authenticator } from 'otplib'
+import { generateSecret, generateURI, verify as verifyOtp } from 'otplib'
 import QRCode from 'qrcode'
 import { prisma } from '../index.js'
 import { AppError } from '../middleware/errorHandler.js'
-import { config } from '../config/index.js'
 
 const ISSUER = 'Pro FundX'
 
@@ -16,12 +15,11 @@ export class TwoFactorService {
     if (!user) throw new AppError('User not found', 404)
     if (user.twoFactorEnabled) throw new AppError('Two-factor authentication is already enabled. Disable it first.', 400)
 
-    const secret = authenticator.generateSecret()
-    const otpauthUrl = authenticator.keyuri(user.email, ISSUER, secret)
+    const secret = generateSecret()
+    const otpauthUrl = generateURI({ issuer: ISSUER, label: user.email, secret })
     const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl)
 
     // Store the secret temporarily (not yet enabled)
-    // We use a separate key to avoid overwriting a working secret
     await prisma.user.update({
       where: { id: userId },
       data: { twoFactorSecret: secret },
@@ -32,7 +30,6 @@ export class TwoFactorService {
 
   /**
    * Verify the initial TOTP code to complete 2FA setup.
-   * Called after generateSecret — confirms the user can generate valid codes.
    */
   async verifySetup(userId: string, token: string): Promise<void> {
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, twoFactorSecret: true, twoFactorEnabled: true } })
@@ -40,8 +37,8 @@ export class TwoFactorService {
     if (user.twoFactorEnabled) throw new AppError('Two-factor authentication is already enabled', 400)
     if (!user.twoFactorSecret) throw new AppError('No pending 2FA setup. Call /2fa/setup first.', 400)
 
-    const isValid = authenticator.verify({ token, secret: user.twoFactorSecret })
-    if (!isValid) throw new AppError('Invalid verification code. Please try again.', 400)
+    const result = await verifyOtp({ token, secret: user.twoFactorSecret })
+    if (!result.valid) throw new AppError('Invalid verification code. Please try again.', 400)
 
     await prisma.user.update({
       where: { id: userId },
@@ -51,7 +48,6 @@ export class TwoFactorService {
 
   /**
    * Verify a TOTP code during login (after password validation).
-   * Returns true if valid, throws if invalid.
    */
   async verifyLogin(userId: string, token: string): Promise<boolean> {
     const user = await prisma.user.findUnique({
@@ -63,8 +59,8 @@ export class TwoFactorService {
       throw new AppError('Two-factor authentication is not enabled', 400)
     }
 
-    const isValid = authenticator.verify({ token, secret: user.twoFactorSecret })
-    if (!isValid) throw new AppError('Invalid two-factor code', 401)
+    const result = await verifyOtp({ token, secret: user.twoFactorSecret })
+    if (!result.valid) throw new AppError('Invalid two-factor code', 401)
 
     return true
   }
@@ -81,8 +77,8 @@ export class TwoFactorService {
     if (!user.twoFactorEnabled) throw new AppError('Two-factor authentication is not enabled', 400)
     if (!user.twoFactorSecret) throw new AppError('2FA secret not found', 500)
 
-    const isValid = authenticator.verify({ token, secret: user.twoFactorSecret })
-    if (!isValid) throw new AppError('Invalid verification code. Cannot disable 2FA without a valid code.', 400)
+    const result = await verifyOtp({ token, secret: user.twoFactorSecret })
+    if (!result.valid) throw new AppError('Invalid verification code. Cannot disable 2FA without a valid code.', 400)
 
     await prisma.user.update({
       where: { id: userId },

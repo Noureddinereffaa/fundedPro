@@ -43,7 +43,7 @@ export class MarketDataService {
     await this.cache.connect(process.env.REDIS_URL)
     await marketDataPublisher.connect(process.env.REDIS_URL)
     this.initialized = true
-    logger.info('MarketDataService: initialized with providers', configs.map(c => c.name))
+    logger.info(`MarketDataService: initialized with providers [${configs.map(c => c.name).join(', ')}]`)
   }
 
   async shutdown(): Promise<void> {

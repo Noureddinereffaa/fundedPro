@@ -13,6 +13,9 @@ import { authLimiter, tradingLimiter, adminLimiter, generalLimiter } from './uti
 import { initSentry } from './utils/sentry.js'
 import { metricsMiddleware, metricsHandler, collectBusinessMetrics } from './utils/metrics.js'
 import { ProviderName } from './market-data/types.js'
+import { createLogger } from './utils/logger.js'
+
+const log = createLogger('server')
 
 // Routes
 import authRoutes from './routes/auth.js'
@@ -31,6 +34,7 @@ import { localeMiddleware } from './middleware/localeMiddleware.js'
 import contactRoutes from './routes/contact.js'
 import settingsRoutes from './routes/settings.js'
 import badgeRoutes from './routes/badges.js'
+import twoFactorRoutes from './routes/twoFactor.js'
 import paymentWebhookRoutes from './routes/payment-webhook.js'
 import seoRoutes from './routes/seo.js'
 
@@ -118,6 +122,7 @@ app.use('/api/leaderboard', generalLimiter, leaderboardRoutes)
 app.use('/api/contact', generalLimiter, contactRoutes)
 app.use('/api/settings', generalLimiter, settingsRoutes)
 app.use('/api/badges', generalLimiter, badgeRoutes)
+app.use('/api/2fa', generalLimiter, twoFactorRoutes)
 app.use('/api/payments', paymentWebhookRoutes)
 
 // Auto-translation webhook
@@ -141,7 +146,7 @@ const PORT = config.API_PORT || 3001
 async function start() {
   try {
     await prisma.$connect()
-    console.log('Database connected')
+    log.info('Database connected')
 
     // Start Redis cache (non-blocking)
     const { initCache } = await import('./utils/redisCache.js')

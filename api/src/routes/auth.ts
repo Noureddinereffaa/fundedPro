@@ -29,6 +29,7 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string(),
+  totpCode: z.string().length(6).regex(/^\d{6}$/).optional(),
 })
 
 const isProd = process.env.NODE_ENV === 'production'
@@ -56,7 +57,13 @@ router.post('/register', registerLimiter, async (req, res) => {
 router.post('/login', authLimiter, async (req, res) => {
   try {
     const data = loginSchema.parse(req.body)
-    const result = await authService.login(data.email, data.password, req.headers['user-agent'], req.ip)
+    const result = await authService.login(data.email, data.password, req.headers['user-agent'], req.ip, data.totpCode)
+
+    if (result.requiresTwoFactor) {
+      res.json({ requiresTwoFactor: true, user: result.user })
+      return
+    }
+
     res.cookie('refreshToken', result.refreshToken, cookieOpts)
     res.json({ user: result.user, accessToken: result.accessToken })
   } catch (error: unknown) {
