@@ -167,15 +167,11 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
-    ports:
-      - "9090:9090"
     depends_on:
       - api
     restart: unless-stopped
     mem_limit: 256m
     cpus: 0.5
-    profiles:
-      - production
 
   # Grafana (visualization dashboards)
   grafana:
@@ -187,15 +183,11 @@ services:
       GF_INSTALL_PLUGINS: ""
     volumes:
       - grafana_data:/var/lib/grafana
-    ports:
-      - "3000:3000"
     depends_on:
       - prometheus
     restart: unless-stopped
     mem_limit: 256m
     cpus: 0.5
-    profiles:
-      - production
 
 volumes:
   postgres_data:
