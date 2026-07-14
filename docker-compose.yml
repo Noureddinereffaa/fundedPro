@@ -100,6 +100,25 @@ services:
     mem_limit: 512m
     cpus: 1.0
 
+  # WebSocket v2 — Redis Bridge (all asset classes)
+  ws-v2:
+    build:
+      context: .
+      dockerfile: Dockerfile.ws-v2
+    container_name: pro-fundx-ws-v2
+    environment:
+      WS_V2_PORT: 3003
+      NODE_ENV: production
+      REDIS_URL: redis://:${REDIS_PASSWORD:-vzWfhsVDtVaRNDb4N9z_-K8utpq5lIjx}@redis:6379
+    ports:
+      - "3003:3003"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+
   # Nginx Reverse Proxy
   nginx:
     image: nginx:alpine

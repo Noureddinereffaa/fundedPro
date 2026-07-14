@@ -12,6 +12,7 @@ import { getBlacklistSize } from './utils/tokenBlacklist.js'
 import { authLimiter, tradingLimiter, adminLimiter, generalLimiter } from './utils/rateLimiters.js'
 import { initSentry } from './utils/sentry.js'
 import { metricsMiddleware, metricsHandler, collectBusinessMetrics } from './utils/metrics.js'
+import { ProviderName } from './market-data/types.js'
 
 // Routes
 import authRoutes from './routes/auth.js'
@@ -226,6 +227,23 @@ async function start() {
     await collectBusinessMetrics(prisma)
     setInterval(() => collectBusinessMetrics(prisma), 5 * 60 * 1000)
     console.log('Business metrics collector started (5min interval)')
+
+    // Initialize Market Data Service (providers, registry, cache, Redis PubSub)
+    const { marketDataService, initializeRegistry } = await import('./market-data/index.js')
+    const { providerFactory, CCXTProvider, OpenBBProvider, YahooFinanceProvider, StooqProvider } = await import('./market-data/index.js')
+    initializeRegistry()
+    providerFactory.register(ProviderName.CCXT, CCXTProvider)
+    providerFactory.register(ProviderName.OPENBB, OpenBBProvider)
+    providerFactory.register(ProviderName.YAHOO, YahooFinanceProvider)
+    providerFactory.register(ProviderName.STOOQ, StooqProvider)
+
+    await marketDataService.initialize([
+      { name: ProviderName.CCXT, enabled: true, priority: 1, rateLimit: 1200, rateLimitInterval: 60000, options: { defaultType: 'spot' } },
+      { name: ProviderName.YAHOO, enabled: true, priority: 2, rateLimit: 500, rateLimitInterval: 60000 },
+      { name: ProviderName.STOOQ, enabled: true, priority: 3, rateLimit: 100, rateLimitInterval: 60000 },
+      { name: ProviderName.OPENBB, enabled: !!process.env.OPENBB_API_KEY, priority: 4, apiKey: process.env.OPENBB_API_KEY || '', rateLimit: 100, rateLimitInterval: 60000 },
+    ])
+    console.log('Market Data Service initialized')
 
     app.listen(PORT, () => {
       console.log(`API server running on port ${PORT}`)

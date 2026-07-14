@@ -1,0 +1,12 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY server/package*.json ./
+RUN npm ci
+
+COPY server/v2/ ./v2/
+
+EXPOSE 3003
+
+CMD ["node", "v2/index.js"]
