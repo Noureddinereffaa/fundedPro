@@ -12,7 +12,7 @@ export interface Candle {
 /** @deprecated Use Candle instead */
 export type Kline = Candle
 
-export type MarketType = 'crypto' | 'rwa'
+export type MarketType = 'crypto' | 'rwa' | 'forex' | 'metals' | 'indices'
 
 export interface MarketSymbol {
   symbol: string

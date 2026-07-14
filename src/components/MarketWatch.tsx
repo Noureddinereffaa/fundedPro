@@ -10,14 +10,20 @@ interface MarketWatchProps {
   activeSymbol: string
 }
 
-const GROUP_ORDER = ['Crypto']
+const GROUP_ORDER = ['Forex', 'Crypto', 'Metals', 'Indices']
 
 const GROUP_ICONS: Record<string, string> = {
   Crypto: '₿',
+  Forex: '💱',
+  Metals: '🥇',
+  Indices: '📈',
 }
 
 const TYPE_COLORS: Record<string, string> = {
   crypto: '#f97316',
+  forex: '#3b82f6',
+  metals: '#eab308',
+  indices: '#8b5cf6',
 }
 
 export function MarketWatch({ onSelectSymbol, activeSymbol }: MarketWatchProps) {

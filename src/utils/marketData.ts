@@ -3,17 +3,17 @@ import { dataClient } from './wsClient'
 import { generateMockKlines } from './mockData'
 import symbols from '../../shared/symbols.json'
 
-const CRYPTO_ONLY_SYMBOLS = Object.entries(symbols)
-  .filter(([, info]) => info.type === 'crypto')
+const ALL_SYMBOLS_RAW = Object.entries(symbols)
+  .filter(([, info]) => info.type !== 'rwa')
   .map(([sym, info]) => ({
     symbol: sym,
     name: info.name,
     type: info.type as MarketType,
     digits: info.digits,
-    group: 'Crypto',
+    group: info.group || info.type,
   }))
 
-export const ALL_SYMBOLS: MarketSymbol[] = CRYPTO_ONLY_SYMBOLS
+export const ALL_SYMBOLS: MarketSymbol[] = ALL_SYMBOLS_RAW
 export const SYMBOL_MAP: Map<string, MarketSymbol> = new Map(ALL_SYMBOLS.map((s) => [s.symbol, s]))
 
 export function getMarketInfo(symbol: string): MarketSymbol | undefined {
