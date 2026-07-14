@@ -10,6 +10,8 @@ import { MarketDataCache } from './cache.js'
 import { MarketDataError, AllProvidersFailedError, ProviderNotConnectedError } from './errors.js'
 import { marketDataPublisher } from './redis-pubsub.js'
 import { logger } from '../utils/logger.js'
+import { generateMockKlines } from './mockData.js'
+import { RESOLUTION_SECONDS } from './types.js'
 
 interface SubscriptionManager {
   ticker: Map<string, Set<(ticker: Ticker) => void>>
@@ -105,9 +107,20 @@ export class MarketDataService {
       }
     } catch (err) {
       logger.error(`MarketDataService: batch ticker error: ${err}`)
-    }
+}
 
-    return result
+    // All providers failed - return mock data as last resort
+    logger.warn(`MarketDataService: all providers failed for ${sym.id}, returning mock data`)
+    return this.getMockCandles(sym, resolution, from, to, limit)
+  }
+
+  private getMockCandles(sym: SymbolDefinition, resolution: Resolution, from?: number, to?: number, limit: number = 500): Candle[] {
+    const toTs = to || Math.floor(Date.now() / 1000)
+    const fromTs = from || (toTs - 30 * 86400)
+    const resSec = RESOLUTION_SECONDS[resolution] || 86400
+    const count = Math.min(limit, Math.floor((toTs - fromTs) / resSec) + 1)
+    const symbol = sym.id.replace('/', '')
+    return generateMockKlines(symbol, resolution, fromTs, toTs).slice(0, count)
   }
 
   async getOHLCV(
@@ -267,6 +280,15 @@ export class MarketDataService {
     }
 
     throw new AllProvidersFailedError(sym.id, errors)
+  }
+
+  private async getMockCandles(symbol: string, resolution: Resolution, from?: number, to?: number, limit: number = 500): Promise<Candle[]> {
+    const toTime = to || Math.floor(Date.now() / 1000)
+    const fromTime = from || Math.floor(Date.now() / 1000) - 86400 * 30
+    const resolutionStr = RESOLUTION_SECONDS[resolution] ? resolution : 'D1'
+    return generateMockKlines(symbol, resolutionStr, from || toTime - 86400 * 30, toTime)
+      .slice(0, limit)
+  }
   }
 
   private async startTickerSubscription(symbol: string): Promise<void> {
