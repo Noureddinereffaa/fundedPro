@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { prisma } from '../index.js'
+import { getErrorInfo } from '../middleware/errorHandler.js'
 
 const router = Router()
 
@@ -18,8 +19,9 @@ router.get('/', async (_req, res) => {
     }, {} as Record<string, string>)
 
     res.json(settingsMap)
-  } catch (error: any) {
-    console.error('[Settings] Error:', error.message)
+  } catch (error: unknown) {
+    const { message } = getErrorInfo(error)
+    console.error('[Settings] Error:', message)
     res.status(500).json({ error: 'Failed to load settings' })
   }
 })

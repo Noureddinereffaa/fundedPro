@@ -119,12 +119,13 @@ export class MatchingEngine {
               new EmailService().sendOrderFilled(order.account.user.email, order.symbol, order.side, order.type, Number(order.volume), currentPrice).catch(() => {})
             }).catch(() => {})
           } catch { /* non-blocking */ }
-        } catch (err: any) {
+        } catch (err: unknown) {
+          const errMsg = err instanceof Error ? err.message : 'Matching engine execution failed'
           await prisma.order.update({
             where: { id: order.id },
             data: {
               status: 'failed',
-              errorMessage: err.message || 'Matching engine execution failed',
+              errorMessage: errMsg,
             },
           })
         }
@@ -241,8 +242,8 @@ export class MatchingEngine {
               }).catch(() => {})
             }
           } catch { /* non-blocking */ }
-        } catch (err: any) {
-          console.error(`[MatchingEngine] SL/TP close failed for ${position.id}: ${err.message}`)
+        } catch (err: unknown) {
+          console.error(`[MatchingEngine] SL/TP close failed for ${position.id}: ${err instanceof Error ? err.message : 'Unknown error'}`)
         }
       } else {
         // Update floating PnL & current price live
@@ -254,8 +255,8 @@ export class MatchingEngine {
               profit: floatingPnl,
             },
           })
-        } catch (err: any) {
-          console.error(`[MatchingEngine] Failed to update position ${position.id}: ${err.message}`)
+        } catch (err: unknown) {
+          console.error(`[MatchingEngine] Failed to update position ${position.id}: ${err instanceof Error ? err.message : 'Unknown error'}`)
         }
       }
     }
@@ -314,8 +315,8 @@ export class MatchingEngine {
             data: { stopLoss: roundedSL },
           })
           trailedCount += 1
-        } catch (err: any) {
-          console.error(`[MatchingEngine] Failed to update trailing stop for ${posId}: ${err.message}`)
+        } catch (err: unknown) {
+          console.error(`[MatchingEngine] Failed to update trailing stop for ${posId}: ${err instanceof Error ? err.message : 'Unknown error'}`)
         }
       }
     }
@@ -375,8 +376,8 @@ export class MatchingEngine {
             },
           })
           movedCount += 1
-        } catch (err: any) {
-          console.error(`[MatchingEngine] Failed to update break-even SL for ${position.id}: ${err.message}`)
+        } catch (err: unknown) {
+          console.error(`[MatchingEngine] Failed to update break-even SL for ${position.id}: ${err instanceof Error ? err.message : 'Unknown error'}`)
         }
       }
     }

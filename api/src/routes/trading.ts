@@ -4,7 +4,7 @@ import { TradingService } from '../services/trading.js'
 import { authenticate } from '../middleware/auth.js'
 import { AuthRequest } from '../types/index.js'
 import { verifyAccountOwnership } from '../utils/ownership.js'
-import { AppError } from '../middleware/errorHandler.js'
+import { AppError, getErrorInfo } from '../middleware/errorHandler.js'
 import { PriceSnapshotClient } from '../utils/priceClient.js'
 import { validateId } from '../middleware/validateId.js'
 
@@ -52,8 +52,9 @@ router.post('/order', authenticate, async (req: AuthRequest, res) => {
     await verifyAccountOwnership(accountId, req.user!.id)
     const result = await tradingService.placeOrder(accountId, orderData)
     res.json(result)
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -64,8 +65,9 @@ router.put('/order/:id', authenticate, validateId('id'), async (req: AuthRequest
     await verifyAccountOwnership(accountId, req.user!.id)
     const result = await tradingService.modifyOrder(req.params.id, accountId, modifications)
     res.json(result)
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -76,8 +78,9 @@ router.delete('/order/:id', authenticate, validateId('id'), async (req: AuthRequ
     await verifyAccountOwnership(accountId, req.user!.id)
     await tradingService.cancelOrder(req.params.id, accountId)
     res.json({ message: 'Order cancelled' })
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -87,8 +90,9 @@ router.get('/positions/:accountId', authenticate, validateId('accountId'), async
     await verifyAccountOwnership(req.params.accountId, req.user!.id)
     const positions = await tradingService.getOpenPositions(req.params.accountId)
     res.json(positions)
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -98,9 +102,9 @@ router.get('/orders/:accountId', authenticate, validateId('accountId'), async (r
     await verifyAccountOwnership(req.params.accountId, req.user!.id)
     const orders = await tradingService.getPendingOrders(req.params.accountId)
     res.json(orders)
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -111,8 +115,9 @@ router.put('/position/:id', authenticate, validateId('id'), async (req: AuthRequ
     await verifyAccountOwnership(accountId, req.user!.id)
     const result = await tradingService.modifyPosition(req.params.id, accountId, modifications)
     res.json(result)
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -124,8 +129,9 @@ router.post('/position/:id/close', authenticate, validateId('id'), async (req: A
 
     const result = await tradingService.closePosition(req.params.id, accountId, volume)
     res.json(result)
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -136,8 +142,9 @@ router.post('/positions/:accountId/close-all', authenticate, validateId('account
     await verifyAccountOwnership(accountId, req.user!.id)
     const results = await tradingService.closeAllPositions(accountId)
     res.json({ message: `Attempted to close ${results.length} positions`, results })
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -149,9 +156,9 @@ router.get('/history/:accountId', authenticate, validateId('accountId'), async (
     const limit = Number(req.query.limit) || 50
     const result = await tradingService.getTradeHistory(req.params.accountId, page, limit)
     res.json(result)
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -161,9 +168,9 @@ router.get('/stats/:accountId', authenticate, validateId('accountId'), async (re
     await verifyAccountOwnership(req.params.accountId, req.user!.id)
     const stats = await tradingService.getStatistics(req.params.accountId)
     res.json(stats)
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 

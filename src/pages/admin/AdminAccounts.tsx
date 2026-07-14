@@ -3,6 +3,7 @@ import AdminLayout from './AdminLayout.tsx'
 import { adminApi } from '../../utils/api.ts'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../../contexts/ToastContext.tsx'
+import type { Account } from '../../../shared/types'
 import { th, pageBtn, editBtn } from '../../utils/cssConstants.ts'
 
 const td: React.CSSProperties = { padding: '12px 16px', color: '#e0e0e0' }
@@ -48,9 +49,9 @@ export default function AdminAccountsPage() {
 
   const fields = ['status', 'phase', 'balance', 'equity', 'leverage', 'maxDailyLoss', 'maxOverallLoss', 'profitTarget']
 
-  const openEdit = (a: any) => {
+  const openEdit = (a: Account) => {
     setEditAccount(a)
-    const data: Record<string, any> = {}
+    const data: Record<string, string> = {}
     for (const f of fields) {
       data[f] = a[f] !== undefined && a[f] !== null ? String(a[f]) : ''
     }

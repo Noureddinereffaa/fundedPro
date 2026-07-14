@@ -151,7 +151,7 @@ export class EmailService {
     await this.send(email, 'Reset your password — Pro FundX', layout('Password Reset', body))
   }
 
-  async sendAccountCreated(email: string, account: any): Promise<void> {
+  async sendAccountCreated(email: string, account: { accountSize: number | { toNumber(): number }; phase?: string | null; accountType?: string | null; platform?: string | null; login?: string | null }): Promise<void> {
     const body = `
       ${heading('Your Trading Account is Ready! 📊')}
       ${paragraph('Congratulations! Your funded trading account has been created. Here are your account details:')}

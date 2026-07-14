@@ -22,11 +22,11 @@ function PortfolioPage() {
   const chartInstanceRef = useRef<ReturnType<typeof createChart> | null>(null)
 
   useEffect(() => {
-    accountApi.getSummary().then((res: any) => {
-      setData(res)
+    accountApi.getSummary().then((res: unknown) => {
+      setData(res as typeof data)
       setLoading(false)
     })
-    accountApi.getPortfolioEquity().then((res: any) => setEquityData(res))
+    accountApi.getPortfolioEquity().then((res: unknown) => setEquityData(res as typeof equityData))
   }, [])
 
   useEffect(() => {

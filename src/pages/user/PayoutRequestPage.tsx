@@ -35,7 +35,7 @@ export default function PayoutRequestPage() {
         })
         .catch(() => {})
         .finally(() => setLoading(false))
-      paymentApi.getPayouts().then((history: any) => setPayouts(history || [])).catch(() => {})
+      paymentApi.getPayouts().then((history: unknown) => setPayouts((history as unknown[]) || [])).catch(() => {})
     }
   }, [user])
 
@@ -59,7 +59,7 @@ export default function PayoutRequestPage() {
       addToast('Payout request submitted successfully', 'success')
       setAmount(''); setWalletAddress('')
       loadMaxPayout(selectedAccount)
-      paymentApi.getPayouts().then((history: any) => setPayouts(history || [])).catch(() => {})
+      paymentApi.getPayouts().then((history: unknown) => setPayouts((history as unknown[]) || [])).catch(() => {})
     } catch (err: unknown) {
       addToast(err instanceof Error ? err.message : 'Failed to submit', 'error')
     } finally {

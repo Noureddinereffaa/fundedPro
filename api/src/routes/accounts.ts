@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { AccountService } from '../services/account.js'
 import { authenticate } from '../middleware/auth.js'
 import { AuthRequest } from '../types/index.js'
-import { AppError } from '../middleware/errorHandler.js'
+import { AppError, getErrorInfo } from '../middleware/errorHandler.js'
 
 const purchaseSchema = z.object({
   accountSize: z.number().positive(),
@@ -18,8 +18,9 @@ router.get('/summary', authenticate, async (req: AuthRequest, res) => {
   try {
     const summary = await accountService.getPortfolioSummary(req.user!.id)
     res.json(summary)
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -29,8 +30,9 @@ router.get('/summary/equity', authenticate, async (req: AuthRequest, res) => {
     const days = Number(req.query.days) || 90
     const history = await accountService.getPortfolioEquityHistory(req.user!.id, days)
     res.json(history)
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -41,9 +43,9 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
     const limit = Number(req.query.limit) || 20
     const result = await accountService.getAccounts(req.user!.id, page, limit)
     res.json(result)
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -52,8 +54,9 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
   try {
     const account = await accountService.getAccount(req.params.id, req.user!.id)
     res.json(account)
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -63,11 +66,12 @@ router.post('/purchase', authenticate, async (req: AuthRequest, res) => {
     const { accountSize, accountType } = purchaseSchema.parse(req.body)
     const result = await accountService.purchaseAccount(req.user!.id, accountSize, accountType)
     res.json(result)
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors[0].message })
     }
-    res.status(error.statusCode || 500).json({ error: error.message })
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -77,9 +81,9 @@ router.get('/:id/snapshots', authenticate, async (req: AuthRequest, res) => {
     const days = Number(req.query.days) || 30
     const snapshots = await accountService.getDailySnapshots(req.params.id, days)
     res.json(snapshots)
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 

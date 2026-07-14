@@ -1,5 +1,5 @@
 import { prisma } from '../index.js'
-import { AppError } from '../middleware/errorHandler.js'
+import { AppError, getErrorInfo } from '../middleware/errorHandler.js'
 import { RuleEngine } from './rule.js'
 import { AccountService } from './account.js'
 import { calculateMargin, calculatePnL } from '../utils/helpers.js'
@@ -392,8 +392,9 @@ export class TradingService {
       try {
         await this.closePosition(position.id, accountId, undefined, price)
         results.push({ id: position.id, status: 'closed' })
-      } catch (error: any) {
-        results.push({ id: position.id, status: 'error', error: error.message || 'close failed' })
+      } catch (error: unknown) {
+        const { message } = getErrorInfo(error)
+        results.push({ id: position.id, status: 'error', error: message || 'close failed' })
       }
     }
 

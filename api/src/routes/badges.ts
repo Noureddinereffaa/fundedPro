@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { authenticate, authorize } from '../middleware/auth.js'
 import { BadgeService } from '../services/badge.js'
 import type { AuthRequest } from '../types/index.js'
+import { getErrorInfo } from '../middleware/errorHandler.js'
 
 const router = Router()
 const badgeService = new BadgeService()
@@ -11,8 +12,9 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
   try {
     const badges = await badgeService.getAllBadges(req.user!.id)
     res.json(badges)
-  } catch (error: any) {
-    console.error('[Badges] Error:', error.message)
+  } catch (error: unknown) {
+    const { message } = getErrorInfo(error)
+    console.error('[Badges] Error:', message)
     res.status(500).json({ error: 'Failed to load badges' })
   }
 })
@@ -22,8 +24,9 @@ router.get('/user', authenticate, async (req: AuthRequest, res) => {
   try {
     const badges = await badgeService.getUserBadges(req.user!.id)
     res.json(badges)
-  } catch (error: any) {
-    console.error('[Badges] Error:', error.message)
+  } catch (error: unknown) {
+    const { message } = getErrorInfo(error)
+    console.error('[Badges] Error:', message)
     res.status(500).json({ error: 'Failed to load user badges' })
   }
 })
@@ -43,8 +46,9 @@ router.post('/check', authenticate, async (req: AuthRequest, res) => {
       cleanDays: cleanDays ?? 0,
     })
     res.json({ awarded })
-  } catch (error: any) {
-    console.error('[Badges] Check error:', error.message)
+  } catch (error: unknown) {
+    const { message } = getErrorInfo(error)
+    console.error('[Badges] Check error:', message)
     res.status(500).json({ error: 'Failed to check badges' })
   }
 })
@@ -54,8 +58,9 @@ router.post('/seed', authenticate, authorize('admin'), async (_req, res) => {
   try {
     await badgeService.seedDefaultBadges()
     res.json({ message: 'Default badges seeded' })
-  } catch (error: any) {
-    console.error('[Badges] Seed error:', error.message)
+  } catch (error: unknown) {
+    const { message } = getErrorInfo(error)
+    console.error('[Badges] Seed error:', message)
     res.status(500).json({ error: 'Failed to seed badges' })
   }
 })
@@ -65,8 +70,9 @@ router.post('/', authenticate, authorize('admin'), async (req, res) => {
   try {
     const badge = await badgeService.createBadge(req.body)
     res.status(201).json(badge)
-  } catch (error: any) {
-    console.error('[Badges] Create error:', error.message)
+  } catch (error: unknown) {
+    const { message } = getErrorInfo(error)
+    console.error('[Badges] Create error:', message)
     res.status(500).json({ error: 'Failed to create badge' })
   }
 })
@@ -75,8 +81,9 @@ router.put('/:id', authenticate, authorize('admin'), async (req, res) => {
   try {
     const badge = await badgeService.updateBadge(req.params.id, req.body)
     res.json(badge)
-  } catch (error: any) {
-    console.error('[Badges] Update error:', error.message)
+  } catch (error: unknown) {
+    const { message } = getErrorInfo(error)
+    console.error('[Badges] Update error:', message)
     res.status(500).json({ error: 'Failed to update badge' })
   }
 })
@@ -85,8 +92,9 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
   try {
     await badgeService.deleteBadge(req.params.id)
     res.json({ message: 'Badge deleted' })
-  } catch (error: any) {
-    console.error('[Badges] Delete error:', error.message)
+  } catch (error: unknown) {
+    const { message } = getErrorInfo(error)
+    console.error('[Badges] Delete error:', message)
     res.status(500).json({ error: 'Failed to delete badge' })
   }
 })

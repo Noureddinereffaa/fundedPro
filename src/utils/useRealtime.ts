@@ -244,7 +244,7 @@ export function useRealtimeCandles(
       initialRef.current(cached)
     }
 
-    let localStatus: any
+    let localStatus: MarketStatus
     try {
       localStatus = getMarketStatus(sym)
     } catch {

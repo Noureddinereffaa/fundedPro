@@ -1,19 +1,10 @@
 import { prisma } from '../index.js'
+import type { Prisma } from '@prisma/client'
 
-interface BadgeCriteria {
-  type: string
-  value: number
-}
+type BadgeCriteria = { type: string; value: number }
+type DefaultBadgeDef = { key: string; category: string; tier: number; name: string; description: string; icon: string; criteria: BadgeCriteria }
 
-const DEFAULT_BADGES: Array<{
-  key: string
-  category: string
-  tier: number
-  name: string
-  description: string
-  icon: string
-  criteria: BadgeCriteria
-}> = [
+const DEFAULT_BADGES: DefaultBadgeDef[] = [
   // ── Progression ──
   { key: 'passed_evaluation', category: 'progression', tier: 2, name: 'Passed Evaluation', description: 'Successfully passed an evaluation phase', icon: '📜', criteria: { type: 'passed_evaluation', value: 1 } },
   { key: 'funded', category: 'progression', tier: 3, name: 'Funded Trader', description: 'Achieved funded trader status', icon: '💰', criteria: { type: 'funded', value: 1 } },
@@ -45,8 +36,8 @@ export class BadgeService {
     for (const badge of DEFAULT_BADGES) {
       await prisma.badge.upsert({
         where: { key: badge.key },
-        update: { name: badge.name, description: badge.description, icon: badge.icon, tier: badge.tier, category: badge.category, criteria: badge.criteria as any },
-        create: badge as any,
+        update: { name: badge.name, description: badge.description, icon: badge.icon, tier: badge.tier, category: badge.category, criteria: badge.criteria as Prisma.InputJsonValue },
+        create: badge as Prisma.BadgeCreateInput,
       })
     }
   }
@@ -147,12 +138,12 @@ export class BadgeService {
     return awarded
   }
 
-  async createBadge(data: { key: string; category: string; tier: number; name: string; description: string; icon: string; criteria: BadgeCriteria }): Promise<any> {
-    return prisma.badge.create({ data: data as any })
+  async createBadge(data: DefaultBadgeDef): Promise<Prisma.BadgeGetPayload<{}>> {
+    return prisma.badge.create({ data: data as Prisma.BadgeCreateInput })
   }
 
-  async updateBadge(id: string, data: Partial<{ name: string; description: string; icon: string; tier: number; category: string; criteria: BadgeCriteria }>): Promise<any> {
-    return prisma.badge.update({ where: { id }, data: data as any })
+  async updateBadge(id: string, data: Partial<DefaultBadgeDef>): Promise<Prisma.BadgeGetPayload<{}>> {
+    return prisma.badge.update({ where: { id }, data: data as Prisma.BadgeUpdateInput })
   }
 
   async deleteBadge(id: string): Promise<void> {

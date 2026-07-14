@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { prisma } from '../index.js'
 import { z } from 'zod'
+import { getErrorInfo } from '../middleware/errorHandler.js'
 
 const router = Router()
 
@@ -26,11 +27,12 @@ router.post('/', async (req, res) => {
     })
 
     res.json({ message: 'Message sent successfully' })
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors[0].message })
     }
-    console.error('[Contact] Error:', error.message)
+    const { message } = getErrorInfo(error)
+    console.error('[Contact] Error:', message)
     res.status(500).json({ error: 'Failed to send message' })
   }
 })

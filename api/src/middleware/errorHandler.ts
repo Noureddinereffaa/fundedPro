@@ -15,6 +15,12 @@ export class AppError extends Error {
   }
 }
 
+export function getErrorInfo(error: unknown): { statusCode: number; message: string } {
+  if (error instanceof AppError) return { statusCode: error.statusCode, message: error.message }
+  if (error instanceof Error) return { statusCode: 500, message: error.message }
+  return { statusCode: 500, message: 'Internal server error' }
+}
+
 export function errorHandler(err: Error, req: Request, res: Response, next: NextFunction): void {
   if (err instanceof ZodError) {
     const errors = err.errors.map((e) => ({ field: e.path.join('.'), message: e.message }))

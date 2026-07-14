@@ -116,7 +116,7 @@ export class NowPaymentsService {
       const emailService = new EmailService()
       const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } })
       if (user) {
-        await emailService.sendAccountCreated(user.email, {}).catch(() => {})
+        await emailService.sendAccountCreated(user.email, { accountSize: 0 }).catch(() => {})
       }
     } else if (['failed', 'expired', 'refunded'].includes(paymentStatus)) {
       await prisma.payment.update({

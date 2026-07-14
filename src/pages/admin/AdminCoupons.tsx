@@ -35,8 +35,8 @@ export default function AdminCoupons() {
     try {
       const res = await api.get('/admin/coupons')
       setCoupons(res.data)
-    } catch (err: any) {
-      addToast(err.response?.data?.error || t('coupons.loadingFailed'), 'error')
+    } catch (err: unknown) {
+      addToast(err instanceof Error ? err.message : t('coupons.loadingFailed'), 'error')
     } finally {
       setLoading(false)
     }
@@ -59,8 +59,8 @@ export default function AdminCoupons() {
       setShowModal(false)
       setFormData({ code: '', discountType: 'percentage', discountValue: '', maxUses: '', expiresAt: '' })
       fetchCoupons()
-    } catch (err: any) {
-      addToast(err.response?.data?.error || t('coupons.createFailed'), 'error')
+    } catch (err: unknown) {
+      addToast(err instanceof Error ? err.message : t('coupons.createFailed'), 'error')
     }
   }
 

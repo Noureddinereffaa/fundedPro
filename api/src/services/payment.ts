@@ -80,7 +80,7 @@ export class PaymentService {
       where: { id: payment.id },
       data: {
         txHash,
-        metadata: { ...((payment.metadata as any) || {}), txHash, submittedAt: new Date().toISOString() },
+        metadata: { ...((payment.metadata as Record<string, unknown>) || {}), txHash, submittedAt: new Date().toISOString() },
       },
     })
     return updated
@@ -94,7 +94,7 @@ export class PaymentService {
     return payment
   }
 
-  async handleWebhook(_event: any) {
+  async handleWebhook(_event: unknown) {
     // Crypto payments don't use webhooks — admin verifies manually
   }
 
@@ -105,8 +105,8 @@ export class PaymentService {
     if (!account) throw new AppError('Account not found or not funded', 404)
 
     const trades = await prisma.trade.findMany({ where: { accountId } })
-    const totalProfit = trades.reduce((sum: number, t: any) => sum + Math.max(0, Number(t.profit)), 0)
-    const totalLoss = Math.abs(trades.reduce((sum: number, t: any) => sum + Math.min(0, Number(t.profit)), 0))
+    const totalProfit = trades.reduce((sum, t) => sum + Math.max(0, Number(t.profit)), 0)
+    const totalLoss = Math.abs(trades.reduce((sum, t) => sum + Math.min(0, Number(t.profit)), 0))
     const netProfit = totalProfit - totalLoss
 
     const previousPayouts = await prisma.payoutRequest.aggregate({

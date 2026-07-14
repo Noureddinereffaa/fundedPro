@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { getErrorInfo } from '../middleware/errorHandler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOCALES_DIR = path.join(__dirname, '../../locales');
@@ -83,8 +84,9 @@ router.post('/translate', authenticate, authorize('admin'), async (req, res) => 
     }
 
     return res.json({ success: true, results });
-  } catch (error) {
-    console.error('[AutoTranslate] Error:', error);
+  } catch (error: unknown) {
+    const { message } = getErrorInfo(error);
+    console.error('[AutoTranslate] Error:', message);
     return res.status(500).json({ error: 'Translation pipeline failed' });
   }
 });

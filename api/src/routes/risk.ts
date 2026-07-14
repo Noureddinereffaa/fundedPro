@@ -3,7 +3,7 @@ import { RuleEngine } from '../services/rule.js'
 import { authenticate } from '../middleware/auth.js'
 import { AuthRequest } from '../types/index.js'
 import { verifyAccountOwnership } from '../utils/ownership.js'
-import { AppError } from '../middleware/errorHandler.js'
+import { AppError, getErrorInfo } from '../middleware/errorHandler.js'
 import { validateId } from '../middleware/validateId.js'
 
 const router = Router()
@@ -58,9 +58,9 @@ router.get('/status/:accountId', authenticate, validateId('accountId'), async (r
 
     const dailyPnL = await ruleEngine.calculateDailyPnL(req.params.accountId)
     res.json(buildRiskStatus(account, dailyPnL))
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -88,8 +88,9 @@ router.get('/batch', authenticate, async (req: AuthRequest, res) => {
     }
 
     res.json(result)
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 

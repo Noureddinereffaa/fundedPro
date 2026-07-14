@@ -1,11 +1,12 @@
 import { Router } from 'express'
 import { prisma } from '../index.js'
 import { authenticate, authorize } from '../middleware/auth.js'
-import { AppError } from '../middleware/errorHandler.js'
+import { AppError, getErrorInfo } from '../middleware/errorHandler.js'
 import { AuthRequest } from '../types/index.js'
 import { AuditService } from '../services/audit.js'
 import { validateId } from '../middleware/validateId.js'
 import bcrypt from 'bcryptjs'
+import type { Prisma, TradingRuleConfig } from '@prisma/client'
 
 const router = Router()
 const audit = new AuditService()
@@ -35,9 +36,9 @@ router.get('/stats', async (req, res) => {
       pendingPayouts,
       totalRevenue: totalRevenue._sum.amount || 0,
     })
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -65,9 +66,9 @@ router.get('/users', async (req, res) => {
     ])
 
     res.json({ users, total, page, totalPages: Math.ceil(total / limit) })
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -75,17 +76,17 @@ router.get('/users', async (req, res) => {
 router.put('/users/:id', validateId('id'), async (req: AuthRequest, res) => {
   try {
     const allowed = ['role', 'emailVerified', 'kycStatus', 'firstName', 'lastName', 'phone', 'country']
-    const data: Record<string, any> = {}
+    const data: Record<string, string | boolean | null | undefined> = {}
     for (const key of allowed) {
       if (req.body[key] !== undefined) data[key] = req.body[key]
     }
     if (Object.keys(data).length === 0) return res.status(400).json({ error: 'No valid fields provided' })
-    const user = await prisma.user.update({ where: { id: req.params.id }, data })
+    const user = await prisma.user.update({ where: { id: req.params.id }, data: data as Prisma.UserUpdateInput })
     await audit.log(req.user!.id, 'update_user', req.params.id, { fields: Object.keys(data) })
     res.json(user)
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -107,9 +108,9 @@ router.get('/accounts', async (req, res) => {
     ])
 
     res.json({ accounts, total, page, totalPages: Math.ceil(total / limit) })
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -126,17 +127,17 @@ router.put('/accounts/:id', validateId('id'), async (req: AuthRequest, res) => {
       'maxOverallLoss',
       'profitTarget',
     ]
-    const data: Record<string, any> = {}
+    const data: Record<string, string | number | null | undefined> = {}
     for (const key of allowed) {
       if (req.body[key] !== undefined) data[key] = req.body[key]
     }
     if (Object.keys(data).length === 0) return res.status(400).json({ error: 'No valid fields provided' })
-    const account = await prisma.account.update({ where: { id: req.params.id }, data })
+    const account = await prisma.account.update({ where: { id: req.params.id }, data: data as Prisma.AccountUpdateInput })
     await audit.log(req.user!.id, 'update_account', req.params.id, { fields: Object.keys(data) })
     res.json(account)
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -147,7 +148,7 @@ router.put('/payouts/:id', validateId('id'), async (req: AuthRequest, res) => {
     if (!status || !['pending', 'approved', 'completed', 'rejected'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' })
     }
-    const data: Record<string, any> = { status }
+    const data: Record<string, string | Date | undefined> = { status }
     if (status === 'completed' || status === 'rejected') {
       data.processedAt = new Date()
     }
@@ -156,13 +157,13 @@ router.put('/payouts/:id', validateId('id'), async (req: AuthRequest, res) => {
     }
     const payout = await prisma.payoutRequest.update({
       where: { id: req.params.id },
-      data,
+      data: data as Prisma.PayoutRequestUpdateInput,
     })
     await audit.log(req.user!.id, `payout_${status}`, req.params.id, txHash ? { txHash } : undefined)
     res.json(payout)
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -184,9 +185,9 @@ router.get('/payouts', async (req, res) => {
     ])
 
     res.json({ payouts, total, page, totalPages: Math.ceil(total / limit) })
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -201,9 +202,9 @@ router.get('/violations', async (req, res) => {
       },
     })
     res.json(violations)
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -224,7 +225,7 @@ const RULES_FIELDS = [
 router.get('/rules/matrix', async (_req, res) => {
   try {
     const configs = await prisma.tradingRuleConfig.findMany()
-    const matrix: Record<string, Record<string, any>> = {}
+    const matrix: Record<string, Record<string, TradingRuleConfig | null>> = {}
     for (const size of ACCOUNT_SIZES) {
       matrix[size] = {}
       for (const phase of PHASES) {
@@ -232,8 +233,9 @@ router.get('/rules/matrix', async (_req, res) => {
       }
     }
     res.json({ matrix, sizes: ACCOUNT_SIZES, phases: PHASES })
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -246,8 +248,9 @@ router.get('/rules/:accountSize/:phase', async (req, res) => {
       where: { accountSize_phase: { accountSize, phase } },
     })
     res.json(config || null)
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -255,7 +258,7 @@ router.get('/rules/:accountSize/:phase', async (req, res) => {
 router.put('/rules/:accountSize/:phase', async (req: AuthRequest, res) => {
   try {
     const allowed: string[] = [...RULES_FIELDS, 'leverage']
-    const data: Record<string, any> = {}
+    const data: Record<string, string | number | boolean | null | undefined> = {}
     for (const key of allowed) {
       if (req.body[key] !== undefined) data[key] = req.body[key]
     }
@@ -273,35 +276,35 @@ router.put('/rules/:accountSize/:phase', async (req: AuthRequest, res) => {
 
     const config = await prisma.tradingRuleConfig.upsert({
       where: { accountSize_phase: { accountSize, phase } },
-      update: data,
+      update: data as Prisma.TradingRuleConfigUpdateInput,
       create: {
         accountSize,
         phase,
-        profitTarget: data.profitTarget ?? 8,
-        maxDailyLoss: data.maxDailyLoss ?? 5,
-        maxOverallLoss: data.maxOverallLoss ?? 10,
-        maxPositionSize: data.maxPositionSize ?? 5,
-        maxLeverage: data.maxLeverage ?? 100,
-        maxOpenTrades: data.maxOpenTrades ?? 10,
-        minTradingDays: data.minTradingDays ?? 5,
-        maxTradingDays: data.maxTradingDays ?? 30,
-        commission: data.commission ?? 0,
-        spreadMarkup: data.spreadMarkup ?? 0,
-        newsRestriction: data.newsRestriction ?? false,
+        profitTarget: Number(data.profitTarget ?? 8),
+        maxDailyLoss: Number(data.maxDailyLoss ?? 5),
+        maxOverallLoss: Number(data.maxOverallLoss ?? 10),
+        maxPositionSize: Number(data.maxPositionSize ?? 5),
+        maxLeverage: Number(data.maxLeverage ?? 100),
+        maxOpenTrades: Number(data.maxOpenTrades ?? 10),
+        minTradingDays: Number(data.minTradingDays ?? 5),
+        maxTradingDays: Number(data.maxTradingDays ?? 30),
+        commission: Number(data.commission ?? 0),
+        spreadMarkup: Number(data.spreadMarkup ?? 0),
+        newsRestriction: Boolean(data.newsRestriction ?? false),
       },
     })
     
     // If requested, apply changes to all active accounts of this size & phase
     if (applyToExisting) {
-      const updateData: Record<string, any> = {}
-      if (data.profitTarget !== undefined) updateData.profitTarget = data.profitTarget
-      if (data.maxDailyLoss !== undefined) updateData.maxDailyLoss = data.maxDailyLoss
-      if (data.maxOverallLoss !== undefined) updateData.maxOverallLoss = data.maxOverallLoss
-      if (data.maxPositionSize !== undefined) updateData.maxPositionSize = data.maxPositionSize
-      if (data.maxOpenTrades !== undefined) updateData.maxOpenTrades = data.maxOpenTrades
-      if (data.minTradingDays !== undefined) updateData.minTradingDays = data.minTradingDays
-      if (data.maxTradingDays !== undefined) updateData.maxTradingDays = data.maxTradingDays
-      if (data.maxLeverage !== undefined) updateData.leverage = data.maxLeverage
+      const updateData: Record<string, number> = {}
+      if (data.profitTarget !== undefined) updateData.profitTarget = data.profitTarget as number
+      if (data.maxDailyLoss !== undefined) updateData.maxDailyLoss = data.maxDailyLoss as number
+      if (data.maxOverallLoss !== undefined) updateData.maxOverallLoss = data.maxOverallLoss as number
+      if (data.maxPositionSize !== undefined) updateData.maxPositionSize = data.maxPositionSize as number
+      if (data.maxOpenTrades !== undefined) updateData.maxOpenTrades = data.maxOpenTrades as number
+      if (data.minTradingDays !== undefined) updateData.minTradingDays = data.minTradingDays as number
+      if (data.maxTradingDays !== undefined) updateData.maxTradingDays = data.maxTradingDays as number
+      if (data.maxLeverage !== undefined) updateData.leverage = data.maxLeverage as number
 
       if (Object.keys(updateData).length > 0) {
         await prisma.account.updateMany({
@@ -310,16 +313,16 @@ router.put('/rules/:accountSize/:phase', async (req: AuthRequest, res) => {
             phase,
             status: { in: ['active', 'passed'] }
           },
-          data: updateData,
+          data: updateData as Prisma.AccountUpdateManyMutationInput,
         })
       }
     }
 
     await audit.log(req.user!.id, 'update_rules', `${accountSize}/${phase}`, { fields: Object.keys(data), applyToExisting: !!applyToExisting })
     res.json(config)
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -340,9 +343,9 @@ router.get('/payments', async (req, res) => {
       prisma.payment.count(),
     ])
     res.json({ payments, total, page, totalPages: Math.ceil(total / limit) })
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -359,11 +362,12 @@ router.put('/payments/:id', validateId('id'), async (req: AuthRequest, res) => {
     if (payment.status === 'rejected') return res.status(400).json({ error: 'Payment already rejected' })
 
     if (status === 'approved') {
-      const meta = payment.metadata as any
-      if (!meta?.accountSize || !meta?.accountType) {
+      const rawMeta = payment.metadata as Record<string, unknown>
+      if (!rawMeta?.accountSize || !rawMeta?.accountType) {
         return res.status(400).json({ error: 'Payment metadata missing accountSize/accountType' })
       }
 
+      const meta = rawMeta as { accountSize: number; accountType: string; promoCode?: string }
       const phase = meta.accountType === 'funded' ? 'funded' : 'evaluation_1'
 
       const result = await prisma.$transaction(async (tx) => {
@@ -455,10 +459,10 @@ router.put('/payments/:id', validateId('id'), async (req: AuthRequest, res) => {
       await audit.log(req.user!.id, 'reject_payment', req.params.id)
       res.json({ payment: updated })
     }
-  } catch (error: any) {
-    console.error('Payment approval failed:', error)
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message || 'Failed to process payment' })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    console.error('Payment approval failed:', message)
+    res.status(statusCode).json({ error: message || 'Failed to process payment' })
   }
 })
 
@@ -479,8 +483,9 @@ router.get('/audit-log', async (req: AuthRequest, res) => {
       prisma.auditLog.count(),
     ])
     res.json({ logs, total, page, totalPages: Math.ceil(total / limit) })
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -492,8 +497,9 @@ router.get('/coupons', async (req, res) => {
       orderBy: { createdAt: 'desc' }
     })
     res.json(coupons)
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -514,10 +520,11 @@ router.post('/coupons', async (req, res) => {
     
     await audit.log((req as AuthRequest).user!.id, 'create_coupon', coupon.id, coupon)
     res.status(201).json(coupon)
-  } catch (error: any) {
-    if (error.code === 'P2002') return res.status(400).json({ error: 'Coupon code already exists' })
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const errWithCode = error as { code?: string }
+    if (errWithCode.code === 'P2002') return res.status(400).json({ error: 'Coupon code already exists' })
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -531,8 +538,9 @@ router.put('/coupons/:id', validateId('id'), async (req, res) => {
     
     await audit.log((req as AuthRequest).user!.id, 'update_coupon', coupon.id, { isActive })
     res.json(coupon)
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -544,8 +552,9 @@ router.delete('/coupons/:id', validateId('id'), async (req, res) => {
     
     await audit.log((req as AuthRequest).user!.id, 'delete_coupon', coupon.id, undefined)
     res.json({ message: 'Coupon deleted successfully' })
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -555,8 +564,9 @@ router.get('/settings', async (_req, res) => {
   try {
     const settings = await prisma.platformSetting.findMany()
     res.json(settings)
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -573,9 +583,9 @@ router.put('/settings', async (req, res) => {
 
     await audit.log((req as AuthRequest).user!.id, 'update_setting', key, { value })
     res.json(setting)
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -587,8 +597,9 @@ router.get('/contact-messages', async (_req, res) => {
       orderBy: { createdAt: 'desc' }
     })
     res.json(messages)
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -605,9 +616,9 @@ router.put('/contact-messages/:id', validateId('id'), async (req, res) => {
     })
 
     res.json(message)
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -616,8 +627,9 @@ router.delete('/contact-messages/:id', validateId('id'), async (req, res) => {
     await prisma.contactMessage.delete({ where: { id: req.params.id } })
     await audit.log((req as AuthRequest).user!.id, 'delete_message', req.params.id, undefined)
     res.json({ message: 'Message deleted' })
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 

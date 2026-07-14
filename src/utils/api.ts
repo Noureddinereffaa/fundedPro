@@ -43,7 +43,7 @@ class ApiClient {
     return this.refreshPromise
   }
 
-  private async request<T = any>(endpoint: string, options: FetchOptions = {}, retryCount = 0): Promise<T> {
+  private async request<T = unknown>(endpoint: string, options: FetchOptions = {}, retryCount = 0): Promise<T> {
     const { params, ...fetchOptions } = options
 
     let url = `${API_BASE}${endpoint}`
@@ -94,11 +94,11 @@ class ApiClient {
     return response.json()
   }
 
-  get<T = any>(endpoint: string, options?: FetchOptions) {
+  get<T = unknown>(endpoint: string, options?: FetchOptions) {
     return this.request<T>(endpoint, { ...options, method: 'GET' })
   }
 
-  post<T = any>(endpoint: string, body?: any, options?: FetchOptions) {
+  post<T = unknown>(endpoint: string, body?: unknown, options?: FetchOptions) {
     return this.request<T>(endpoint, {
       ...options,
       method: 'POST',
@@ -106,7 +106,7 @@ class ApiClient {
     })
   }
 
-  put<T = any>(endpoint: string, body?: any, options?: FetchOptions) {
+  put<T = unknown>(endpoint: string, body?: unknown, options?: FetchOptions) {
     return this.request<T>(endpoint, {
       ...options,
       method: 'PUT',
@@ -114,7 +114,7 @@ class ApiClient {
     })
   }
 
-  delete<T = any>(endpoint: string, options?: FetchOptions) {
+  delete<T = unknown>(endpoint: string, options?: FetchOptions) {
     return this.request<T>(endpoint, { ...options, method: 'DELETE' })
   }
 }
@@ -236,15 +236,15 @@ export const adminApi = {
   processPayout: (id: string, status: string, txHash?: string) =>
     api.put(`/admin/payouts/${id}`, { status, txHash }),
   getCoupons: () => api.get('/admin/coupons'),
-  createCoupon: (data: any) => api.post('/admin/coupons', data),
-  updateCoupon: (id: string, data: any) => api.put(`/admin/coupons/${id}`, data),
+  createCoupon: (data: Record<string, unknown>) => api.post('/admin/coupons', data),
+  updateCoupon: (id: string, data: Record<string, unknown>) => api.put(`/admin/coupons/${id}`, data),
   deleteCoupon: (id: string) => api.delete(`/admin/coupons/${id}`),
 
   getSettings: () => api.get('/admin/settings'),
-  updateSetting: (data: any) => api.put('/admin/settings', data),
+  updateSetting: (data: Record<string, unknown>) => api.put('/admin/settings', data),
 
   getContactMessages: () => api.get('/admin/contact-messages'),
-  updateContactMessage: (id: string, data: any) => api.put(`/admin/contact-messages/${id}`, data),
+  updateContactMessage: (id: string, data: Record<string, unknown>) => api.put(`/admin/contact-messages/${id}`, data),
   deleteContactMessage: (id: string) => api.delete(`/admin/contact-messages/${id}`),
   getViolations: () => api.get('/admin/violations'),
   getPayments: (page = 1, limit = 20) => api.get('/admin/payments', { params: { page, limit } }),
@@ -255,8 +255,8 @@ export const adminApi = {
     api.get(`/admin/rules/${accountSize}/${phase}`),
   getRulesMatrix: () => api.get('/admin/rules/matrix'),
   getBadges: () => api.get('/admin/badges'),
-  createBadge: (data: any) => api.post('/admin/badges', data),
-  updateBadge: (id: string, data: any) => api.put(`/admin/badges/${id}`, data),
+  createBadge: (data: Record<string, unknown>) => api.post('/admin/badges', data),
+  updateBadge: (id: string, data: Record<string, unknown>) => api.put(`/admin/badges/${id}`, data),
   deleteBadge: (id: string) => api.delete(`/admin/badges/${id}`),
   seedBadges: () => api.post('/admin/badges/seed'),
 }
@@ -264,5 +264,5 @@ export const adminApi = {
 export const badgeApi = {
   getAll: () => api.get('/badges'),
   getUserBadges: () => api.get('/badges/user'),
-  check: (stats: any) => api.post('/badges/check', stats),
+  check: (stats: Record<string, unknown>) => api.post('/badges/check', stats),
 }

@@ -3,9 +3,9 @@ import { z } from 'zod'
 import jwt from 'jsonwebtoken'
 import { AuthService } from '../services/auth.js'
 import { authenticate } from '../middleware/auth.js'
-import { AuthRequest, JwtPayload } from '../types/index.js'
+import { AuthRequest } from '../types/index.js'
 import { config } from '../config/index.js'
-import { AppError } from '../middleware/errorHandler.js'
+import { AppError, getErrorInfo } from '../middleware/errorHandler.js'
 import { addToBlacklist } from '../utils/tokenBlacklist.js'
 import { authLimiter, registerLimiter, forgotPasswordLimiter, changePasswordLimiter } from '../utils/rateLimiters.js'
 
@@ -46,8 +46,9 @@ router.post('/register', registerLimiter, async (req, res) => {
     const result = await authService.register(data.email, data.password, data.firstName, data.lastName)
     res.cookie('refreshToken', result.refreshToken, cookieOpts)
     res.json({ user: result.user, accessToken: result.accessToken })
-  } catch (error: any) {
-    res.status(error.statusCode || 400).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -58,8 +59,9 @@ router.post('/login', authLimiter, async (req, res) => {
     const result = await authService.login(data.email, data.password, req.headers['user-agent'], req.ip)
     res.cookie('refreshToken', result.refreshToken, cookieOpts)
     res.json({ user: result.user, accessToken: result.accessToken })
-  } catch (error: any) {
-    res.status(error.statusCode || 400).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -70,8 +72,9 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
     if (!email) return res.status(400).json({ error: 'Email is required' })
     await authService.forgotPassword(email)
     res.json({ message: 'If the email exists, a reset link has been sent' })
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -86,8 +89,9 @@ router.post('/reset-password', async (req, res) => {
     }
     await authService.resetPassword(token, password)
     res.json({ message: 'Password reset successfully' })
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -96,7 +100,7 @@ router.get('/verify-email/:token', async (req, res) => {
   try {
     await authService.verifyEmail(req.params.token)
     res.redirect(`${config.CLIENT_URL}/verify-email/${req.params.token}`)
-  } catch (error: any) {
+  } catch (error: unknown) {
     res.redirect(`${config.CLIENT_URL}/verify-email/${req.params.token}?error=invalid`)
   }
 })
@@ -108,9 +112,10 @@ router.post('/verify-email', async (req, res) => {
     if (!token) return res.status(400).json({ error: 'Token is required' })
     await authService.verifyEmail(token)
     res.json({ message: 'Email verified successfully' })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const { message } = getErrorInfo(error)
     const statusCode = error instanceof AppError ? error.statusCode : 400
-    res.status(statusCode).json({ error: error.message || 'Invalid or expired verification link' })
+    res.status(statusCode).json({ error: message || 'Invalid or expired verification link' })
   }
 })
 
@@ -119,8 +124,9 @@ router.get('/verify-reset/:token', async (req, res) => {
   try {
     await authService.verifyResetToken(req.params.token)
     res.json({ valid: true })
-  } catch (error: any) {
-    res.status(400).json({ error: error.message })
+  } catch (error: unknown) {
+    const { message } = getErrorInfo(error)
+    res.status(400).json({ error: message })
   }
 })
 
@@ -132,8 +138,9 @@ router.post('/refresh', async (req, res) => {
     const tokens = await authService.refreshToken(token)
     res.cookie('refreshToken', tokens.refreshToken, cookieOpts)
     res.json({ accessToken: tokens.accessToken })
-  } catch (error: any) {
-    res.status(error.statusCode || 401).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -148,16 +155,16 @@ router.post('/logout', async (req, res) => {
       if (authHeader?.startsWith('Bearer ')) {
         const accessToken = authHeader.slice(7)
         try {
-          const decoded = jwt.verify(accessToken, config.JWT_SECRET) as JwtPayload
-          addToBlacklist(accessToken, (decoded as any).exp * 1000)
+          const decoded = jwt.verify(accessToken, config.JWT_SECRET) as jwt.JwtPayload
+          if (decoded.exp) addToBlacklist(accessToken, decoded.exp * 1000)
         } catch { /* token already expired — ignore */ }
       }
     }
     res.clearCookie('refreshToken')
     res.json({ message: 'Logged out' })
-  } catch (error: any) {
-    const statusCode = error instanceof AppError ? error.statusCode : 500
-    res.status(statusCode).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -166,8 +173,9 @@ router.get('/me', authenticate, async (req: AuthRequest, res) => {
   try {
     const profile = await authService.getProfile(req.user!.id)
     res.json(profile)
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -176,8 +184,9 @@ router.put('/me', authenticate, async (req: AuthRequest, res) => {
   try {
     const profile = await authService.updateProfile(req.user!.id, req.body)
     res.json(profile)
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 
@@ -193,8 +202,9 @@ router.post('/change-password', authenticate, changePasswordLimiter, async (req:
     }
     await authService.changePassword(req.user!.id, currentPassword, newPassword)
     res.json({ message: 'Password changed' })
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({ error: error.message })
+  } catch (error: unknown) {
+    const { statusCode, message } = getErrorInfo(error)
+    res.status(statusCode).json({ error: message })
   }
 })
 

@@ -23,8 +23,8 @@ export function useBadges() {
       const data = await badgeApi.getAll()
       setBadges(data)
       setError(null)
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }

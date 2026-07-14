@@ -20,6 +20,7 @@ import type {
   UTCTimestamp,
   SeriesMarker,
   Time,
+  MouseEventParams,
 } from 'lightweight-charts'
 import { useRealtimeCandles, useMarketStatus, useLivePrice, useSmoothTotalFloatingPnl } from '../utils/useRealtime'
 import { calcMA, calcEMA, calcRSI, calcBB, calcMACD } from '../utils/indicators'
@@ -333,7 +334,7 @@ const ProfessionalChart = memo(function ProfessionalChart({
   )
 
   const handleChartClick = useCallback(
-    (param: any) => {
+    (param: MouseEventParams) => {
       if (!param.time) return
 
       const price =
@@ -430,7 +431,7 @@ const ProfessionalChart = memo(function ProfessionalChart({
   }, [])
 
   const handleCrosshairMove = useCallback(
-    (param: any) => {
+    (param: MouseEventParams) => {
       if (!param?.time) return
       const t = Number(param.time)
       const data = dataRef.current

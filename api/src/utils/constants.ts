@@ -1,5 +1,16 @@
 export const ACCOUNT_SIZES = [5000, 10000, 25000, 50000, 100000, 200000] as const
 
+export interface TradingRuleValues {
+  profitTarget: number | null
+  maxDailyLoss: number | null
+  maxOverallLoss: number | null
+  maxPositionSize: number | null
+  maxLeverage: number | null
+  maxOpenTrades: number | null
+  minTradingDays: number | null
+  maxTradingDays: number | null
+}
+
 export const ACCOUNT_PRICES: Record<number, { evaluation: number; instant: number }> = {
   5000: { evaluation: 49, instant: 99 },
   10000: { evaluation: 79, instant: 159 },
@@ -9,7 +20,7 @@ export const ACCOUNT_PRICES: Record<number, { evaluation: number; instant: numbe
   200000: { evaluation: 699, instant: 1399 },
 }
 
-export const DEFAULT_RULES: Record<string, Record<string, any>> = {
+export const DEFAULT_RULES: Record<string, TradingRuleValues> = {
   evaluation_1: {
     profitTarget: 8,
     maxDailyLoss: 6,
@@ -42,7 +53,7 @@ export const DEFAULT_RULES: Record<string, Record<string, any>> = {
   },
 }
 
-export const DEFAULT_RULES_BY_SIZE: Record<number, Record<string, Record<string, any>>> = {
+export const DEFAULT_RULES_BY_SIZE: Record<number, Record<string, TradingRuleValues>> = {
   5000: {
     evaluation_1: {
       profitTarget: 8,

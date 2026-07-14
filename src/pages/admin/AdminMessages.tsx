@@ -22,7 +22,7 @@ export default function AdminMessages() {
     try {
       const res = await adminApi.getContactMessages()
       setMessages(Array.isArray(res) ? res : (res.data || []))
-    } catch (err: any) {
+    } catch (err: unknown) {
       addToast('Failed to load messages', 'error')
     } finally {
       setLoading(false)

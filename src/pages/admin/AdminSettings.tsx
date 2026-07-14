@@ -26,7 +26,7 @@ export default function AdminSettings() {
     try {
       const res = await adminApi.getSettings()
       setSettings(Array.isArray(res) ? res : (res.data || []))
-    } catch (err: any) {
+    } catch (err: unknown) {
       addToast('Failed to load settings', 'error')
     } finally {
       setLoading(false)
@@ -42,8 +42,8 @@ export default function AdminSettings() {
       await adminApi.updateSetting({ key, value, isPublic })
       addToast('Setting saved', 'success')
       fetchSettings()
-    } catch (err: any) {
-      addToast(err.response?.data?.error || 'Failed to save setting', 'error')
+    } catch (err: unknown) {
+      addToast(err instanceof Error ? err.message : 'Failed to save setting', 'error')
     }
   }
 
