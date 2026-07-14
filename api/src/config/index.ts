@@ -20,6 +20,7 @@ const envSchema = z.object({
   API_PORT: z.coerce.number().default(Number(process.env.API_PORT) || 3001),
   WS_SERVER_URL: z.string().optional().default(process.env.WS_SERVER_URL || 'http://localhost:3002'),
   SERVER_TIMEZONE_OFFSET: z.coerce.number().default(3),
+  SENTRY_DSN: z.string().optional(),
 })
 
 const env = envSchema.safeParse(process.env)

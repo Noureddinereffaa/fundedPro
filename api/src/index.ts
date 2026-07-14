@@ -10,6 +10,7 @@ import { errorHandler } from './middleware/errorHandler.js'
 import { AccountService } from './services/account.js'
 import { getBlacklistSize } from './utils/tokenBlacklist.js'
 import { authLimiter, tradingLimiter, adminLimiter, generalLimiter } from './utils/rateLimiters.js'
+import { initSentry } from './utils/sentry.js'
 
 // Routes
 import authRoutes from './routes/auth.js'
@@ -36,6 +37,9 @@ const app = express()
 
 // Trust nginx reverse proxy (required for rate limiting & X-Forwarded-For)
 app.set('trust proxy', 1)
+
+// Sentry (async init, non-blocking)
+initSentry()
 
 // ── Security ──────────────────────────────────────────────────
 app.use(

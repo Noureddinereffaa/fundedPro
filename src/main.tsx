@@ -5,7 +5,9 @@ import './index.css'
 import App from './App.tsx'
 import { I18nRoot } from './i18n/I18nProvider'
 import { registerSW } from './utils/pwa'
+import { initSentry } from './utils/sentry'
 
+initSentry()
 registerSW()
 
 createRoot(document.getElementById('root')!).render(

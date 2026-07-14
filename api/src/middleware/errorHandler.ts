@@ -30,6 +30,15 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
   // Log full error server-side
   console.error('[ERROR]', err.message, isDev ? err.stack : '')
 
+  // Report to Sentry in production
+  if (!isDev) {
+    import('@sentry/node').then((Sentry) => {
+      Sentry.captureException(err, {
+        extra: { path: req.path, method: req.method },
+      })
+    }).catch(() => {})
+  }
+
   // Never leak stack trace in production
   res.status(500).json({
     error: 'Internal server error',

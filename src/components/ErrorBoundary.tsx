@@ -1,5 +1,6 @@
 import { Component, type ReactNode, type ErrorInfo } from 'react'
 import i18n from 'i18next'
+import { captureException } from '../utils/sentry'
 
 interface Props {
   children: ReactNode
@@ -26,8 +27,8 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    // In production you would forward this to a monitoring service (e.g. Sentry)
     console.error('[ErrorBoundary] Uncaught error:', error, info.componentStack)
+    captureException(error, { componentStack: info.componentStack })
   }
 
   private handleReset = () => {
