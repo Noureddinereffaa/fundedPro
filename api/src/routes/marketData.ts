@@ -14,11 +14,14 @@ const candleSchema = z.object({
 
 router.get('/candles', async (req: Request, res: Response) => {
   try {
+    console.log('[MarketData] candles query:', req.query)
     const { symbol, resolution, from, to, limit } = candleSchema.parse(req.query)
+    console.log('[MarketData] parsed:', { symbol, resolution, from, to, limit })
     const candles = await marketDataService.getOHLCV(symbol, resolution as any, from, to, limit)
     res.json({ symbol, resolution, candles })
   } catch (err) {
-    res.status(400).json({ error: 'Invalid parameters' })
+    console.error('[MarketData] candles error:', err)
+    res.status(400).json({ error: 'Invalid parameters', details: err instanceof Error ? err.message : String(err) })
   }
 })
 

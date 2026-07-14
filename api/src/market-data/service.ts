@@ -120,13 +120,17 @@ export class MarketDataService {
     const sym = symbolRegistry.getBySymbol(symbol)
     if (!sym) throw new MarketDataError(ProviderName.OPENBB, symbol, `Unknown symbol: ${symbol}`, false, 'UNKNOWN_SYMBOL')
 
-    const cacheKey = `${sym.id}:${resolution}`
-    const cached = await this.cache.getCandles(sym.id, resolution)
+    // For non-crypto symbols, fall back to daily resolution if sub-daily requested
+    const isCrypto = sym.marketType === MarketType.CRYPTO
+    const isSubDaily = resolution !== Resolution.D1 && resolution !== Resolution.W1 && resolution !== Resolution.MN1
+    const effectiveResolution = isCrypto || !isSubDaily ? resolution : Resolution.D1
+
+    const cached = await this.cache.getCandles(sym.id, effectiveResolution)
     if (cached && cached.length >= limit) return cached
 
     return this.withFallback<Candle[]>(sym, undefined, async (provider, nativeSymbol) => {
-      const candles = await provider.getOHLCV(nativeSymbol, resolution, from, to, limit)
-      await this.cache.setCandles(sym.id, resolution, candles)
+      const candles = await provider.getOHLCV(nativeSymbol, effectiveResolution, from, to, limit)
+      await this.cache.setCandles(sym.id, effectiveResolution, candles)
       return candles
     })
   }
