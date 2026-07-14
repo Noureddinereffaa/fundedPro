@@ -44,7 +44,6 @@ export class AuthService {
 
     return { user, ...tokens }
   }
-  // ... keep the rest of the methods unchanged
 
   async login(email: string, password: string, userAgent?: string, ip?: string, totpCode?: string): Promise<LoginResult> {
     const user = await prisma.user.findUnique({ where: { email } })
@@ -112,10 +111,15 @@ export class AuthService {
 
   async refreshToken(token: string) {
     const payload = verifyRefreshToken(token)
-    const stored = await prisma.refreshToken.findUnique({ where: { token } })
-    if (!stored || stored.expiresAt < new Date()) throw new AppError('Invalid refresh token', 401)
 
-    await prisma.refreshToken.delete({ where: { token } })
+    // Atomic delete: if two requests arrive with same token, only one succeeds
+    let stored
+    try {
+      stored = await prisma.refreshToken.delete({ where: { token } })
+    } catch {
+      throw new AppError('Invalid refresh token', 401)
+    }
+    if (stored.expiresAt < new Date()) throw new AppError('Invalid refresh token', 401)
 
     const tokens = generateTokens({ id: payload.id, email: payload.email, role: payload.role })
     await this.saveRefreshToken(payload.id, tokens.refreshToken)

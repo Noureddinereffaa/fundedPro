@@ -266,3 +266,15 @@ export const badgeApi = {
   getUserBadges: () => api.get('/badges/user'),
   check: (stats: Record<string, unknown>) => api.post('/badges/check', stats),
 }
+
+// Market Data
+export const marketApi = {
+  getCandles: (symbol: string, resolution: string, from?: number, to?: number, limit?: number) =>
+    api.get('/market/candles', { params: { symbol, resolution, from, to, limit } }),
+  getTicker: (symbol: string) =>
+    api.get('/market/ticker', { params: { symbol } }),
+  getTickers: (symbols: string[]) =>
+    api.get('/market/tickers', { params: { symbols: symbols.join(',') } }),
+  getSymbols: (marketType?: string) =>
+    api.get('/market/symbols', { params: { marketType } }),
+}

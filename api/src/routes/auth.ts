@@ -8,6 +8,7 @@ import { config } from '../config/index.js'
 import { AppError, getErrorInfo } from '../middleware/errorHandler.js'
 import { addToBlacklist } from '../utils/tokenBlacklist.js'
 import { authLimiter, registerLimiter, forgotPasswordLimiter, changePasswordLimiter } from '../utils/rateLimiters.js'
+import { sanitizeText } from '../utils/sanitize.js'
 
 const router = Router()
 const authService = new AuthService()
@@ -22,14 +23,21 @@ const passwordSchema = z
 const registerSchema = z.object({
   email: z.string().email(),
   password: passwordSchema,
-  firstName: z.string().optional(),
-  lastName: z.string().optional(),
+  firstName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
 })
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string(),
   totpCode: z.string().length(6).regex(/^\d{6}$/).optional(),
+})
+
+const updateProfileSchema = z.object({
+  firstName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
+  phone: z.string().max(30).optional(),
+  country: z.string().max(100).optional(),
 })
 
 const isProd = process.env.NODE_ENV === 'production'
@@ -44,7 +52,12 @@ const cookieOpts = {
 router.post('/register', registerLimiter, async (req, res) => {
   try {
     const data = registerSchema.parse(req.body)
-    const result = await authService.register(data.email, data.password, data.firstName, data.lastName)
+    const result = await authService.register(
+      data.email,
+      data.password,
+      data.firstName ? sanitizeText(data.firstName, 100) : undefined,
+      data.lastName ? sanitizeText(data.lastName, 100) : undefined,
+    )
     res.cookie('refreshToken', result.refreshToken, cookieOpts)
     res.json({ user: result.user, accessToken: result.accessToken })
   } catch (error: unknown) {
@@ -189,7 +202,14 @@ router.get('/me', authenticate, async (req: AuthRequest, res) => {
 // Update profile
 router.put('/me', authenticate, async (req: AuthRequest, res) => {
   try {
-    const profile = await authService.updateProfile(req.user!.id, req.body)
+    const data = updateProfileSchema.parse(req.body)
+    const sanitized = {
+      firstName: data.firstName !== undefined ? sanitizeText(data.firstName, 100) : undefined,
+      lastName: data.lastName !== undefined ? sanitizeText(data.lastName, 100) : undefined,
+      phone: data.phone !== undefined ? sanitizeText(data.phone, 30) : undefined,
+      country: data.country !== undefined ? sanitizeText(data.country, 100) : undefined,
+    }
+    const profile = await authService.updateProfile(req.user!.id, sanitized)
     res.json(profile)
   } catch (error: unknown) {
     const { statusCode, message } = getErrorInfo(error)

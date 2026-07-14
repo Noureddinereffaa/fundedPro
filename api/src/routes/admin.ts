@@ -5,6 +5,7 @@ import { AppError, getErrorInfo } from '../middleware/errorHandler.js'
 import { AuthRequest } from '../types/index.js'
 import { AuditService } from '../services/audit.js'
 import { validateId } from '../middleware/validateId.js'
+import { isSafeUrl, sanitizeText } from '../utils/sanitize.js'
 import bcrypt from 'bcryptjs'
 import type { Prisma, TradingRuleConfig } from '@prisma/client'
 
@@ -575,13 +576,21 @@ router.put('/settings', async (req, res) => {
     const { key, value, isPublic, description } = req.body
     if (!key || typeof value !== 'string') throw new AppError('Key and value are required', 400)
 
+    const sanitizedValue = sanitizeText(value, 2000)
+
+    // Validate URLs for keys that represent social/external links
+    const URL_KEYS = ['social_telegram', 'social_discord', 'social_twitter', 'social_youtube', 'website_url', 'contact_email']
+    if (URL_KEYS.includes(key) && !isSafeUrl(sanitizedValue)) {
+      throw new AppError('Invalid URL scheme. Only http/https URLs are allowed.', 400)
+    }
+
     const setting = await prisma.platformSetting.upsert({
       where: { key },
-      update: { value, isPublic, description },
-      create: { key, value, isPublic, description },
+      update: { value: sanitizedValue, isPublic, description: description ? sanitizeText(description, 500) : undefined },
+      create: { key, value: sanitizedValue, isPublic, description: description ? sanitizeText(description, 500) : undefined },
     })
 
-    await audit.log((req as AuthRequest).user!.id, 'update_setting', key, { value })
+    await audit.log((req as AuthRequest).user!.id, 'update_setting', key, { value: sanitizedValue })
     res.json(setting)
   } catch (error: unknown) {
     const { statusCode, message } = getErrorInfo(error)

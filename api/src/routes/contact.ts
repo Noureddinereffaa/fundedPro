@@ -2,7 +2,10 @@ import { Router } from 'express'
 import { prisma } from '../index.js'
 import { z } from 'zod'
 import { getErrorInfo } from '../middleware/errorHandler.js'
+import { sanitizeText, sanitizeEmail } from '../utils/sanitize.js'
+import { createLogger } from '../utils/logger.js'
 
+const log = createLogger('contact')
 const router = Router()
 
 const contactSchema = z.object({
@@ -19,10 +22,10 @@ router.post('/', async (req, res) => {
 
     await prisma.contactMessage.create({
       data: {
-        name: data.name,
-        email: data.email,
-        subject: data.subject,
-        message: data.message,
+        name: sanitizeText(data.name, 100),
+        email: sanitizeEmail(data.email),
+        subject: sanitizeText(data.subject, 200),
+        message: sanitizeText(data.message, 5000),
       },
     })
 
@@ -32,7 +35,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: error.errors[0].message })
     }
     const { message } = getErrorInfo(error)
-    console.error('[Contact] Error:', message)
+    log.error({ err: error }, 'Contact form error')
     res.status(500).json({ error: 'Failed to send message' })
   }
 })

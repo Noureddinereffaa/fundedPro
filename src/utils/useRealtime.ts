@@ -4,6 +4,7 @@ import { wsV2Client } from './wsV2Client'
 import { ALL_SYMBOLS, getMarketInfo, getLookbackDays } from './marketData'
 import { getCachedKlines, setCachedKlines } from './klineCache'
 import { getMarketStatus } from './marketHours'
+import { marketApi } from './api'
 import type { MarketStatus } from '../../shared/types'
 import { calcPnl, getQuoteToUsdRate } from './trading'
 import { generateMockKlines } from './mockData'
@@ -264,7 +265,9 @@ export function useRealtimeCandles(
       return
     }
 
-    dataClient.connect().catch(apiErrorHandler('useRealtime'))
+    // Get symbol info to determine market type
+    const symbolInfo = ALL_SYMBOLS.find(s => s.symbol === sym)
+    const isCrypto = symbolInfo?.type === 'crypto'
 
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -283,30 +286,65 @@ export function useRealtimeCandles(
       if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null }
     }
 
-    fallbackTimer = setTimeout(() => tryMockFallback('WS timeout (4s)'), 4000)
-
-    dataClient
-      .fetchKlines(sym, int)
-      .then((res) => {
-        if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null }
+    const tryRestApiFallback = async () => {
+      if (keyRef.current !== currentKey || loaded) return
+      try {
+        const to = Math.floor(Date.now() / 1000)
+        const lookback = getLookbackDays(int)
+        const from = to - lookback * 86400
+        const res = await marketApi.get(`/market/candles`, {
+          params: { symbol: sym, resolution: int, from, to, limit: 5000 }
+        })
         if (keyRef.current !== currentKey) return
-        if (res?.klines && res.klines.length > 0) {
+        if (res?.candles && res.candles.length > 0) {
           loaded = true
-          setCachedKlines(sym, int, res.klines)
-          initialRef.current(res.klines)
-        } else if (!cached || cached.length === 0) {
-          tryMockFallback('WS returned empty')
+          setCachedKlines(sym, int, res.candles)
+          initialRef.current(res.candles)
+          if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null }
+          return true
+        }
+      } catch (err) {
+        if (import.meta.env.DEV) console.warn(`[useRealtimeCandles] REST API failed for ${sym}:`, err)
+      }
+      return false
+    }
+
+    // For non-crypto symbols, try REST API first
+    if (!isCrypto) {
+      tryRestApiFallback().then((success) => {
+        if (!success && keyRef.current === currentKey) {
+          fallbackTimer = setTimeout(() => tryMockFallback('REST API failed'), 3000)
         }
       })
-      .catch((err) => {
-        if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null }
-        if (keyRef.current !== currentKey) return
-        apiErrorHandler('useRealtime')(err)
-        tryMockFallback('WS error')
-      })
-      .finally(() => {
-        if (keyRef.current === currentKey) setIsLoading(false)
-      })
+    } else {
+      // Crypto: use WS v1
+      dataClient.connect().catch(apiErrorHandler('useRealtime'))
+
+      fallbackTimer = setTimeout(() => tryMockFallback('WS timeout (4s)'), 4000)
+
+      dataClient
+        .fetchKlines(sym, int)
+        .then((res) => {
+          if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null }
+          if (keyRef.current !== currentKey) return
+          if (res?.klines && res.klines.length > 0) {
+            loaded = true
+            setCachedKlines(sym, int, res.klines)
+            initialRef.current(res.klines)
+          } else if (!cached || cached.length === 0) {
+            tryMockFallback('WS returned empty')
+          }
+        })
+        .catch((err) => {
+          if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null }
+          if (keyRef.current !== currentKey) return
+          apiErrorHandler('useRealtime')(err)
+          tryMockFallback('WS error')
+        })
+        .finally(() => {
+          if (keyRef.current === currentKey) setIsLoading(false)
+        })
+    }
 
     const unsub = dataClient.subscribeCandle(sym, int, (kline) => {
       if (keyRef.current !== currentKey) return

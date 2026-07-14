@@ -330,9 +330,18 @@ class DataClient {
         break
       }
 
-      case 'error':
+      case 'error': {
         console.warn(`[DataClient] Server error:`, msg.message)
+        // Reject pending klines requests for this symbol
+        for (const [key, pending] of this.pendingRequests.entries()) {
+          if (key.startsWith(`${msg.symbol}_`)) {
+            clearTimeout(pending.timer)
+            pending.reject(new Error(msg.message))
+            this.pendingRequests.delete(key)
+          }
+        }
         break
+      }
     }
   }
 

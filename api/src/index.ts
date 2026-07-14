@@ -9,7 +9,7 @@ import { config } from './config/index.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import { AccountService } from './services/account.js'
 import { getBlacklistSize, initBlacklist } from './utils/tokenBlacklist.js'
-import { authLimiter, tradingLimiter, adminLimiter, generalLimiter } from './utils/rateLimiters.js'
+import { authLimiter, tradingLimiter, adminLimiter, generalLimiter, initRateLimiterRedis } from './utils/rateLimiters.js'
 import { initSentry } from './utils/sentry.js'
 import { metricsMiddleware, metricsHandler, collectBusinessMetrics } from './utils/metrics.js'
 import { ProviderName } from './market-data/types.js'
@@ -37,6 +37,7 @@ import badgeRoutes from './routes/badges.js'
 import twoFactorRoutes from './routes/twoFactor.js'
 import paymentWebhookRoutes from './routes/payment-webhook.js'
 import seoRoutes from './routes/seo.js'
+import marketDataRoutes from './routes/marketData.js'
 
 // Prisma client
 export const prisma = new PrismaClient()
@@ -133,6 +134,7 @@ app.use(swaggerRoutes)
 
 // SEO: sitemap.xml, robots.txt
 app.use(seoRoutes)
+app.use('/api/market', marketDataRoutes)
 
 // Prometheus metrics (no auth — restricted by nginx to internal network)
 app.get('/metrics', metricsHandler)
@@ -151,13 +153,16 @@ async function start() {
     // Start Redis cache (non-blocking)
     const { initCache } = await import('./utils/redisCache.js')
     initCache().then((ok) => {
-      if (ok) console.log('Redis cache initialized')
+      if (ok) log.info('Redis cache initialized')
     })
 
     // Initialize token blacklist (Redis-backed with in-memory fallback)
     initBlacklist().then((ok) => {
-      if (ok) console.log('Token blacklist initialized (Redis)')
+      if (ok) log.info('Token blacklist initialized (Redis)')
     })
+
+    // Initialize rate limiter Redis (distributed rate limiting)
+    initRateLimiterRedis()
 
     // Start risk check scheduler (every 60 seconds)
     const { RuleEngine } = await import('./services/rule.js')
@@ -167,10 +172,10 @@ async function start() {
       try {
         await Promise.allSettled([ruleEngine.checkAllAccounts(), ruleEngine.checkMarginLevels()])
       } catch (e) {
-        console.error('[BackgroundTask] Risk engine error', e)
+        log.error({ err: e }, 'Risk engine error')
       }
     }, 60_000)
-    console.log('Risk scheduler started (60s interval)')
+    log.info('Risk scheduler started (60s interval)')
 
     // Start matching engine (every 2 seconds)
     const { MatchingEngine } = await import('./services/MatchingEngine.js')
@@ -184,20 +189,20 @@ async function start() {
         await matchingEngine.processBreakEven()
         await matchingEngine.processAlerts()
       } catch (e) {
-        console.error('[BackgroundTask] Matching engine error', e)
+        log.error({ err: e }, 'Matching engine error')
       }
     }, 1_000)
-    console.log('Matching engine started (1s interval)')
+    log.info('Matching engine started (1s interval)')
 
     // Start Swap engine (every 1 hour)
     setInterval(async () => {
       try {
         await matchingEngine.processSwap()
       } catch (e) {
-        console.error('[BackgroundTask] Swap engine error', e)
+        log.error({ err: e }, 'Swap engine error')
       }
     }, 60 * 60 * 1000)
-    console.log('Swap engine scheduled (1h interval)')
+    log.info('Swap engine scheduled (1h interval)')
 
     // Start snapshot scheduler (every 30 minutes)
     const accountService = new AccountService()
@@ -213,12 +218,12 @@ async function start() {
         for (const acc of accounts) {
           await accountService.takeSnapshot(acc.id).catch(() => {})
         }
-        if (accounts.length > 0) console.log(`[Snapshot] ${accounts.length} accounts snapshotted`)
+        if (accounts.length > 0) log.info({ count: accounts.length }, 'Accounts snapshotted')
       } catch (e) {
-        console.error('[BackgroundTask] Snapshot engine error', e)
+        log.error({ err: e }, 'Snapshot engine error')
       }
     }, 30 * 60 * 1000)
-    console.log('Snapshot scheduler started (30min interval)')
+    log.info('Snapshot scheduler started (30min interval)')
 
     // Start NOWPayments polling (every 5 minutes)
     const { NowPaymentsService } = await import('./services/nowpayments.js')
@@ -228,16 +233,16 @@ async function start() {
         try {
           await nowPaymentsService.pollPendingPayments()
         } catch (e) {
-          console.error('[BackgroundTask] NOWPayments poll error', e)
+          log.error({ err: e }, 'NOWPayments poll error')
         }
       }, 5 * 60 * 1000)
-      console.log('NOWPayments poller started (5min interval)')
+      log.info('NOWPayments poller started (5min interval)')
     }
 
     // Collect business metrics every 5 minutes
     await collectBusinessMetrics(prisma)
     setInterval(() => collectBusinessMetrics(prisma), 5 * 60 * 1000)
-    console.log('Business metrics collector started (5min interval)')
+    log.info('Business metrics collector started (5min interval)')
 
     // Initialize Market Data Service (providers, registry, cache, Redis PubSub)
     const { marketDataService, initializeRegistry } = await import('./market-data/index.js')
@@ -254,7 +259,7 @@ async function start() {
       { name: ProviderName.STOOQ, enabled: true, priority: 3, rateLimit: 100, rateLimitInterval: 60000 },
       { name: ProviderName.OPENBB, enabled: !!process.env.OPENBB_API_KEY, priority: 4, apiKey: process.env.OPENBB_API_KEY || '', rateLimit: 100, rateLimitInterval: 60000 },
     ])
-    console.log('Market Data Service initialized')
+    log.info('Market Data Service initialized')
 
     // Subscribe to non-crypto symbols for live data via Redis PubSub
     const nonCryptoSymbols = marketDataService.getAllSymbols()
@@ -265,13 +270,60 @@ async function start() {
         // Already published to Redis inside startTickerSubscription
       })
     }
-    console.log(`Market Data: subscribed to ${nonCryptoSymbols.length} non-crypto symbols for live data`)
+    log.info({ count: nonCryptoSymbols.length }, 'Market Data: subscribed to non-crypto symbols')
 
-    app.listen(PORT, () => {
-      console.log(`API server running on port ${PORT}`)
+    const server = app.listen(PORT, () => {
+      log.info({ port: PORT }, 'API server running')
     })
+
+    // ── Graceful shutdown ─────────────────────────────────────
+    let shuttingDown = false
+    const SHUTDOWN_TIMEOUT = 30_000
+
+    async function shutdown(signal: string) {
+      if (shuttingDown) return
+      shuttingDown = true
+      log.info({ signal }, 'Received shutdown signal — draining connections')
+
+      // Stop accepting new connections
+      server.close(async () => {
+        log.info('HTTP server closed')
+      })
+
+      // Force exit after timeout
+      const forceExit = setTimeout(() => {
+        log.warn('Shutdown timeout exceeded — forcing exit')
+        process.exit(1)
+      }, SHUTDOWN_TIMEOUT)
+      forceExit.unref()
+
+      try {
+        // Close database connections
+        await prisma.$disconnect()
+        log.info('Database disconnected')
+
+        // Close Redis connections
+        const { disconnectCache } = await import('./utils/redisCache.js')
+        await disconnectCache()
+        log.info('Redis cache disconnected')
+
+        const { disconnectBlacklist: blDisconnect } = await import('./utils/tokenBlacklist.js')
+        await blDisconnect()
+        log.info('Token blacklist disconnected')
+
+        clearTimeout(forceExit)
+        log.info('Graceful shutdown complete')
+        process.exit(0)
+      } catch (err) {
+        log.error({ err }, 'Error during shutdown')
+        process.exit(1)
+      }
+    }
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'))
+    process.on('SIGINT', () => shutdown('SIGINT'))
   } catch (error) {
-    console.error('Failed to start server:', error)
+    log.fatal({ err: error }, 'Failed to start server')
     process.exit(1)
   }
 }
