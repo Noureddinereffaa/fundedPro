@@ -1,6 +1,6 @@
 import { createClient, RedisClientType } from 'redis'
 import { Ticker, Candle, OrderBook } from './types.js'
-import { logger } from '../utils/logger'
+import { logger } from '../utils/logger.js'
 
 interface CacheEntry<T> {
   data: T
