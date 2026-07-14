@@ -8,7 +8,7 @@ import { PrismaClient } from '@prisma/client'
 import { config } from './config/index.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import { AccountService } from './services/account.js'
-import { getBlacklistSize } from './utils/tokenBlacklist.js'
+import { getBlacklistSize, initBlacklist } from './utils/tokenBlacklist.js'
 import { authLimiter, tradingLimiter, adminLimiter, generalLimiter } from './utils/rateLimiters.js'
 import { initSentry } from './utils/sentry.js'
 import { metricsMiddleware, metricsHandler, collectBusinessMetrics } from './utils/metrics.js'
@@ -88,11 +88,12 @@ if (config.NODE_ENV !== 'test') {
 app.get('/health', async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`
+    const blacklistSize = await getBlacklistSize()
     res.json({
       status: 'ok',
       timestamp: new Date().toISOString(),
       db: 'connected',
-      blacklistSize: getBlacklistSize(),
+      blacklistSize,
     })
   } catch {
     res.status(503).json({
@@ -146,6 +147,11 @@ async function start() {
     const { initCache } = await import('./utils/redisCache.js')
     initCache().then((ok) => {
       if (ok) console.log('Redis cache initialized')
+    })
+
+    // Initialize token blacklist (Redis-backed with in-memory fallback)
+    initBlacklist().then((ok) => {
+      if (ok) console.log('Token blacklist initialized (Redis)')
     })
 
     // Start risk check scheduler (every 60 seconds)
@@ -244,6 +250,17 @@ async function start() {
       { name: ProviderName.OPENBB, enabled: !!process.env.OPENBB_API_KEY, priority: 4, apiKey: process.env.OPENBB_API_KEY || '', rateLimit: 100, rateLimitInterval: 60000 },
     ])
     console.log('Market Data Service initialized')
+
+    // Subscribe to non-crypto symbols for live data via Redis PubSub
+    const nonCryptoSymbols = marketDataService.getAllSymbols()
+      .filter(s => s.marketType !== 'crypto')
+      .map(s => s.symbol)
+    for (const sym of nonCryptoSymbols) {
+      marketDataService.subscribeTicker(sym, (ticker) => {
+        // Already published to Redis inside startTickerSubscription
+      })
+    }
+    console.log(`Market Data: subscribed to ${nonCryptoSymbols.length} non-crypto symbols for live data`)
 
     app.listen(PORT, () => {
       console.log(`API server running on port ${PORT}`)

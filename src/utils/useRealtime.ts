@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { dataClient } from './wsClient'
+import { wsV2Client } from './wsV2Client'
 import { ALL_SYMBOLS, getMarketInfo, getLookbackDays } from './marketData'
 import { getCachedKlines, setCachedKlines } from './klineCache'
 import { getMarketStatus } from './marketHours'
@@ -183,27 +184,34 @@ export function useAllMarketPrices() {
   useEffect(() => {
     const unsubStatus = dataClient.onStatusChange(setConnectionStatus)
     dataClient.connect().catch(apiErrorHandler('useRealtime'))
+    wsV2Client.connect().catch(apiErrorHandler('useRealtime-wsV2'))
     return unsubStatus
   }, [])
 
   useEffect(() => {
-    const allSymbols = ALL_SYMBOLS.map((s) => s.symbol)
+    const cryptoSymbols = ALL_SYMBOLS.filter((s) => s.type === 'crypto').map((s) => s.symbol)
+    const nonCryptoSymbols = ALL_SYMBOLS.filter((s) => s.type !== 'crypto').map((s) => s.symbol)
 
-    const unsubs = allSymbols.map((symbol) =>
-      dataClient.subscribeTicker(symbol, (price, change) => {
-        const tick: Tick = { symbol, price, change, time: Date.now() }
-        priceCache.set(symbol, tick)
-        pendingRef.current[symbol] = tick
-        notifyListeners()
+    const onTick = (symbol: string) => (price: number, change: number) => {
+      const tick: Tick = { symbol, price, change, time: Date.now() }
+      priceCache.set(symbol, tick)
+      pendingRef.current[symbol] = tick
+      notifyListeners()
+      if (rafRef.current === null) {
+        rafRef.current = requestAnimationFrame(flushUpdates)
+      }
+    }
 
-        if (rafRef.current === null) {
-          rafRef.current = requestAnimationFrame(flushUpdates)
-        }
-      }),
+    const unsubsV1 = cryptoSymbols.map((symbol) =>
+      dataClient.subscribeTicker(symbol, onTick(symbol)),
+    )
+    const unsubsV2 = nonCryptoSymbols.map((symbol) =>
+      wsV2Client.subscribeTicker(symbol, onTick(symbol)),
     )
 
     return () => {
-      unsubs.forEach((fn) => fn())
+      unsubsV1.forEach((fn) => fn())
+      unsubsV2.forEach((fn) => fn())
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current)
         rafRef.current = null

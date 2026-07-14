@@ -156,7 +156,7 @@ router.post('/logout', async (req, res) => {
         const accessToken = authHeader.slice(7)
         try {
           const decoded = jwt.verify(accessToken, config.JWT_SECRET) as jwt.JwtPayload
-          if (decoded.exp) addToBlacklist(accessToken, decoded.exp * 1000)
+          if (decoded.exp) await addToBlacklist(accessToken, decoded.exp * 1000)
         } catch { /* token already expired — ignore */ }
       }
     }
@@ -201,6 +201,15 @@ router.post('/change-password', authenticate, changePasswordLimiter, async (req:
       }
     }
     await authService.changePassword(req.user!.id, currentPassword, newPassword)
+    // Blacklist current access token — password change invalidates all sessions
+    const authHeader = req.headers.authorization
+    if (authHeader?.startsWith('Bearer ')) {
+      const accessToken = authHeader.slice(7)
+      try {
+        const decoded = jwt.verify(accessToken, config.JWT_SECRET) as jwt.JwtPayload
+        if (decoded.exp) await addToBlacklist(accessToken, decoded.exp * 1000)
+      } catch { /* already expired */ }
+    }
     res.json({ message: 'Password changed' })
   } catch (error: unknown) {
     const { statusCode, message } = getErrorInfo(error)

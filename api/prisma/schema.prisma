@@ -23,6 +23,8 @@ model User {
   emailVerifyExpires  DateTime? @map("email_verify_expires")
   resetPasswordToken  String?   @map("reset_password_token")
   resetPasswordExpires DateTime? @map("reset_password_expires")
+  twoFactorEnabled    Boolean   @default(false) @map("two_factor_enabled")
+  twoFactorSecret     String?   @map("two_factor_secret")
   kycStatus           String    @default("none") @map("kyc_status")
   kycDocuments        Json?     @map("kyc_documents")
   role                String    @default("user")

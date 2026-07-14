@@ -1,10 +1,10 @@
-import { Response, NextFunction } from 'express'
+import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { config } from '../config/index.js'
 import { AuthRequest, JwtPayload } from '../types/index.js'
 import { isBlacklisted } from '../utils/tokenBlacklist.js'
 
-export function authenticate(req: AuthRequest, res: Response, next: NextFunction): void {
+export async function authenticate(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
 
@@ -13,9 +13,14 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     return
   }
 
-  if (isBlacklisted(token)) {
-    res.status(401).json({ error: 'Token has been revoked.' })
-    return
+  try {
+    const blacklisted = await isBlacklisted(token)
+    if (blacklisted) {
+      res.status(401).json({ error: 'Token has been revoked.' })
+      return
+    }
+  } catch {
+    // Blacklist check failure is non-fatal — proceed with verification
   }
 
   try {
