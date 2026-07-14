@@ -160,7 +160,46 @@ services:
     profiles:
       - production
 
+  # Prometheus (monitoring & metrics collection)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: pro-fundx-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - api
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+    profiles:
+      - production
+
+  # Grafana (visualization dashboards)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: pro-fundx-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: ""
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+    profiles:
+      - production
+
 volumes:
   postgres_data:
   redis_data:
   db_backups:
+  prometheus_data:
+  grafana_data:

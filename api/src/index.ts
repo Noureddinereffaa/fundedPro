@@ -11,6 +11,7 @@ import { AccountService } from './services/account.js'
 import { getBlacklistSize } from './utils/tokenBlacklist.js'
 import { authLimiter, tradingLimiter, adminLimiter, generalLimiter } from './utils/rateLimiters.js'
 import { initSentry } from './utils/sentry.js'
+import { metricsMiddleware, metricsHandler, collectBusinessMetrics } from './utils/metrics.js'
 
 // Routes
 import authRoutes from './routes/auth.js'
@@ -63,6 +64,9 @@ app.use(
     credentials: true,
   }),
 )
+
+// Prometheus metrics (before routes)
+app.use(metricsMiddleware)
 
 // Locale detection (before routes)
 app.use(localeMiddleware)
@@ -118,6 +122,9 @@ app.use('/api', generalLimiter, translateRoutes)
 
 // Swagger docs (no rate limit)
 app.use(swaggerRoutes)
+
+// Prometheus metrics (no auth — restricted by nginx to internal network)
+app.get('/metrics', metricsHandler)
 
 // Error handler
 app.use(errorHandler)
@@ -210,6 +217,11 @@ async function start() {
       }, 5 * 60 * 1000)
       console.log('NOWPayments poller started (5min interval)')
     }
+
+    // Collect business metrics every 5 minutes
+    await collectBusinessMetrics(prisma)
+    setInterval(() => collectBusinessMetrics(prisma), 5 * 60 * 1000)
+    console.log('Business metrics collector started (5min interval)')
 
     app.listen(PORT, () => {
       console.log(`API server running on port ${PORT}`)
