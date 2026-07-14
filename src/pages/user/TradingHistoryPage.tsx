@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext.tsx'
 import { tradingApi, accountApi } from '../../utils/api.ts'
 import { useTranslation } from 'react-i18next'
 import Layout from '../../components/Layout.tsx'
+import { SeoHead } from '../../i18n/SeoHead'
 import type { TradeHistory, Account } from '../../../shared/types'
 import { th, td, pageBtn } from '../../utils/cssConstants.ts'
 
@@ -77,6 +78,7 @@ export default function TradingHistoryPage() {
 
   return (
     <Layout>
+      <SeoHead title="Trading History" description="View your complete ProFundX trading history." />
       <div style={{ maxWidth: 1200 }}>
         <div
           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}

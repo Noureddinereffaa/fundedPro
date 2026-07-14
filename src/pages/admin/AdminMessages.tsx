@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { adminApi } from '../../utils/api.ts'
 import { useToast } from '../../contexts/ToastContext.tsx'
 import { Mail, CheckCircle, Trash2, Clock } from 'lucide-react'
+import { SeoHead } from '../../i18n/SeoHead'
 
 interface Message {
   id: string
@@ -58,6 +59,7 @@ export default function AdminMessages() {
 
   return (
     <div className="space-y-6">
+      <SeoHead title="Admin: Messages" description="View and manage ProFundX support messages." noIndex={true} />
       <div>
         <h1 className="text-2xl font-bold text-white">Support Messages</h1>
         <p className="text-gray-400 mt-1">Manage incoming messages from the contact form</p>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { adminApi } from '../../utils/api.ts'
 import { useToast } from '../../contexts/ToastContext.tsx'
 import { Save, Plus, Link as LinkIcon, Trash2 } from 'lucide-react'
+import { SeoHead } from '../../i18n/SeoHead'
 
 interface Setting {
   key: string
@@ -55,6 +56,7 @@ export default function AdminSettings() {
 
   return (
     <div className="space-y-6">
+      <SeoHead title="Admin: Settings" description="Manage ProFundX platform settings and configuration." noIndex={true} />
       <div>
         <h1 className="text-2xl font-bold text-white">Platform Settings</h1>
         <p className="text-gray-400 mt-1">Manage global configuration and social links</p>

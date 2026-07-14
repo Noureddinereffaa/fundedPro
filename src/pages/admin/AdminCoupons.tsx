@@ -3,6 +3,7 @@ import { Plus, Trash2, Tag, Percent, DollarSign, Activity } from 'lucide-react'
 import { api } from '../../utils/api'
 import { useToast } from '../../contexts/ToastContext'
 import { useTranslation } from 'react-i18next'
+import { SeoHead } from '../../i18n/SeoHead'
 
 interface Coupon {
   id: string
@@ -95,6 +96,7 @@ export default function AdminCoupons() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <SeoHead title="Admin: Coupons" description="Manage ProFundX coupon codes and discounts." noIndex={true} />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">{t('coupons.title')}</h1>

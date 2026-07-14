@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom'
 import { useState, useCallback, lazy, Suspense } from 'react'
 import { useTranslation } from 'react-i18next'
 import Layout from '../components/Layout.tsx'
+import { SeoHead } from '../i18n/SeoHead'
 import styles from '../styles/trade.module.css'
 import { MarketWatch } from '../components/MarketWatch.tsx'
 import { useTradePage } from './hooks/useTradePage'
@@ -77,6 +78,7 @@ export default function TradePage() {
 
   return (
     <Layout noPadding>
+      <SeoHead title="Trading Terminal" description="ProFundX trading terminal — place trades, manage positions, and monitor the markets." />
       <div className={layoutClassName}>
         <div
           className={`${marketWatchClassName} ${isFullscreen ? styles['trade-market-watch-fs'] : ''} ${isFullscreen ? styles['fs-open'] : ''}`}

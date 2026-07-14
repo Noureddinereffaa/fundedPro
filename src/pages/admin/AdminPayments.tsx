@@ -4,6 +4,7 @@ import AdminLayout from './AdminLayout.tsx'
 import { adminApi } from '../../utils/api.ts'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../../contexts/ToastContext.tsx'
+import { SeoHead } from '../../i18n/SeoHead'
 import type { Payment } from '../../../shared/types'
 import { th, td, actionBtn, pageBtn } from '../../utils/cssConstants.ts'
 
@@ -62,6 +63,7 @@ export default function AdminPaymentsPage() {
 
   return (
     <AdminLayout active="payments">
+      <SeoHead title="Admin: Payments" description="Manage ProFundX payments and transactions." noIndex={true} />
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e0e0e0', margin: 0 }}>{t('payments.title')}</h1>
         <span style={{ color: '#6b7280', fontSize: 13 }}>{t('payments.totalPayments', { count: total })}</span>

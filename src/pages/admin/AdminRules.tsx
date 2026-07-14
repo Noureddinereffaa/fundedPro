@@ -3,6 +3,7 @@ import AdminLayout from './AdminLayout.tsx'
 import { adminApi } from '../../utils/api.ts'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../../contexts/ToastContext.tsx'
+import { SeoHead } from '../../i18n/SeoHead'
 
 const accountSizes = [5000, 10000, 25000, 50000, 100000, 200000]
 const phases = ['evaluation_1', 'evaluation_2', 'funded']
@@ -91,6 +92,7 @@ export default function AdminRulesPage() {
 
   return (
     <AdminLayout active="rules">
+      <SeoHead title="Admin: Trading Rules" description="Configure ProFundX trading rules and evaluation parameters." noIndex={true} />
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e0e0e0', margin: 0 }}>{t('rules.title')}</h1>

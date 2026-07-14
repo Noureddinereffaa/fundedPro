@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useTranslation } from 'react-i18next'
 import Layout from '../../components/Layout.tsx'
+import { SeoHead } from '../../i18n/SeoHead'
 
 const KYC_STATUSES = ['none', 'pending', 'verified', 'rejected'] as const
 type KycStatus = (typeof KYC_STATUSES)[number]
@@ -71,6 +72,7 @@ export default function KycPage() {
 
   return (
     <Layout>
+      <SeoHead title="KYC Verification" description="Complete your identity verification for ProFundX." />
       <div style={{ maxWidth: 700 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e0e0e0', marginBottom: 24 }}>
           {t('kyc.title')}

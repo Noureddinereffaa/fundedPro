@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { ALL_SYMBOLS } from '../utils/marketData.ts'
 import { alertApi } from '../utils/api.ts'
 import { useToast } from '../contexts/ToastContext.tsx'
+import { SeoHead } from '../i18n/SeoHead'
 import type { Alert } from '../../shared/types'
 
 export default function AlertsPage() {
@@ -48,6 +49,7 @@ export default function AlertsPage() {
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: '32px 16px' }}>
+      <SeoHead title="Alerts" description="Manage your ProFundX price alerts and notifications." />
       <h1 style={{ fontSize: 24, fontWeight: 700, color: '#e0e0e0', marginBottom: 24 }}>{t('alerts.title')}</h1>
 
       <div style={{ background: '#111827', borderRadius: 12, padding: 24, border: '1px solid #1f2937', marginBottom: 24 }}>

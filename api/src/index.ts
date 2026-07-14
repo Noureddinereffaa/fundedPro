@@ -31,6 +31,7 @@ import contactRoutes from './routes/contact.js'
 import settingsRoutes from './routes/settings.js'
 import badgeRoutes from './routes/badges.js'
 import paymentWebhookRoutes from './routes/payment-webhook.js'
+import seoRoutes from './routes/seo.js'
 
 // Prisma client
 export const prisma = new PrismaClient()
@@ -122,6 +123,9 @@ app.use('/api', generalLimiter, translateRoutes)
 
 // Swagger docs (no rate limit)
 app.use(swaggerRoutes)
+
+// SEO: sitemap.xml, robots.txt
+app.use(seoRoutes)
 
 // Prometheus metrics (no auth — restricted by nginx to internal network)
 app.get('/metrics', metricsHandler)

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import AdminLayout from './AdminLayout.tsx'
 import { adminApi } from '../../utils/api.ts'
 import { useTranslation } from 'react-i18next'
+import { SeoHead } from '../../i18n/SeoHead'
 import type { AdminStats } from '../../../shared/types'
 
 export default function AdminDashboardPage() {
@@ -19,6 +20,7 @@ export default function AdminDashboardPage() {
 
   return (
     <AdminLayout active="dashboard">
+      <SeoHead title="Admin: Dashboard" description="ProFundX admin dashboard — platform overview and statistics." noIndex={true} />
       <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e0e0e0', marginBottom: 24 }}>
         {t('dashboard.title')}
       </h1>

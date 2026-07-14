@@ -4,6 +4,7 @@ import { accountApi, paymentApi } from '../../utils/api.ts'
 import { useTranslation } from 'react-i18next'
 import Layout from '../../components/Layout.tsx'
 import { useToast } from '../../contexts/ToastContext.tsx'
+import { SeoHead } from '../../i18n/SeoHead'
 import type { Account, Payout } from '../../../shared/types'
 import { th, td } from '../../utils/cssConstants.ts'
 
@@ -73,6 +74,7 @@ export default function PayoutRequestPage() {
 
   return (
     <Layout>
+      <SeoHead title="Request Payout" description="Request a payout from your ProFundX funded account." />
       <div style={{ maxWidth: 700 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e0e0e0', marginBottom: 24 }}>{t('payout.title')}</h1>
 

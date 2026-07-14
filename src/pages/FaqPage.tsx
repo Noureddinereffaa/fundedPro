@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import Footer from '../components/layout/Footer.tsx'
+import { SeoHead } from '../i18n/SeoHead'
 
 export default function FaqPage() {
   const { t, i18n } = useTranslation()
@@ -19,6 +20,7 @@ export default function FaqPage() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#030712' }}>
+      <SeoHead title="FAQ" description="Frequently asked questions about ProFundX evaluations, payouts, and trading rules." />
       <nav style={{ padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1f2937' }}>
         <Link to={`/${lang}`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', letterSpacing: -0.5 }}>

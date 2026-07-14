@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import Layout from '../components/Layout.tsx'
 import { Trophy, TrendingUp, DollarSign, Users, Medal, ChevronUp, Globe } from 'lucide-react'
+import { SeoHead } from '../i18n/SeoHead'
 
 interface LeaderEntry {
   displayName: string
@@ -70,6 +71,7 @@ export default function LeaderboardPage() {
 
   return (
     <Layout>
+      <SeoHead title="Leaderboard" description="Top ProFundX traders — see who's leading the rankings." />
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 16px' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 48 }}>

@@ -3,6 +3,7 @@ import AdminLayout from './AdminLayout.tsx'
 import { adminApi } from '../../utils/api.ts'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../../contexts/ToastContext.tsx'
+import { SeoHead } from '../../i18n/SeoHead'
 import type { Payout } from '../../../shared/types'
 import { th, td, actionBtn, pageBtn } from '../../utils/cssConstants.ts'
 
@@ -51,6 +52,7 @@ export default function AdminPayoutsPage() {
 
   return (
     <AdminLayout active="payouts">
+      <SeoHead title="Admin: Payouts" description="Manage ProFundX payout requests and processing." noIndex={true} />
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e0e0e0', margin: 0 }}>{t('payouts.title')}</h1>

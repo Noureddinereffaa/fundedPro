@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAuth } from '../contexts/AuthContext.tsx'
+import { SeoHead } from '../i18n/SeoHead'
 
 // ── Password strength helpers ─────────────────────────────────────────────
 interface StrengthResult {
@@ -125,6 +126,7 @@ export default function RegisterPage() {
         background: '#0a0e17',
       }}
     >
+      <SeoHead title="Create Account" description="Register for ProFundX and start your journey to becoming a funded trader." />
       <div
         style={{
           width: 440,

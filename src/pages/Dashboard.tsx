@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { accountApi, riskApi } from '../utils/api.ts'
+import { SeoHead } from '../i18n/SeoHead'
 import Layout from '../components/Layout.tsx'
 import { useRealtimePrices, useLivePrice } from '../utils/useRealtime.ts'
 import { EquityChart } from '../components/EquityChart.tsx'
@@ -44,6 +45,7 @@ export default function DashboardPage() {
 
   return (
     <Layout>
+      <SeoHead title="Dashboard" description="Your ProFundX trading dashboard — monitor accounts, performance, and balance." />
       <div className="dash-page" style={{ maxWidth: 1200 }}>
         {/* Live Ticker */}
         <div

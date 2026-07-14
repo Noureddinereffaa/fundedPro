@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { paymentApi } from '../utils/api.ts'
 import { useToast } from '../contexts/ToastContext.tsx'
 import Layout from '../components/Layout.tsx'
+import { SeoHead } from '../i18n/SeoHead'
 
 const accountSizes = [5000, 10000, 25000, 50000, 100000, 200000]
 
@@ -76,6 +77,7 @@ export default function PricingPage() {
 
   return (
     <Layout>
+      <SeoHead title="Pricing &amp; Plans" description="Choose the perfect evaluation plan. Get funded with accounts from $5K to $200K." />
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <h1 style={{ fontSize: 32, fontWeight: 700, color: '#e0e0e0', marginBottom: 8 }}>

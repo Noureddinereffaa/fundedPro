@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { SUPPORTED_LANGUAGES } from '../i18n/config'
+import { SeoHead } from '../i18n/SeoHead'
 import Footer from '../components/layout/Footer.tsx'
 import '../styles/landing.css'
 
@@ -60,6 +61,7 @@ export default function LandingPage() {
 
   return (
     <div className="landing-page">
+      <SeoHead title="Prop Trading Platform" description="ProFundX — Prop Trading Platform. Pass the challenge, get funded, and trade with capital up to $200,000." />
       {/* -- Navigation -- */}
       <nav className={`landing-nav ${scrolled ? 'scrolled' : ''}`}>
         <Link to={`/${lang}`} className="landing-nav-logo">

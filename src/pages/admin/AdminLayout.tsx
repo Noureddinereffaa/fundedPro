@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../contexts/AuthContext.tsx'
+import { SeoHead } from '../../i18n/SeoHead'
 
 export default function AdminLayout({ children, active }: { children: ReactNode; active: string }) {
   const { t, i18n } = useTranslation('admin')
@@ -30,6 +31,7 @@ export default function AdminLayout({ children, active }: { children: ReactNode;
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0a0e17', color: '#e0e0e0' }}>
+      <SeoHead title="Admin Panel" description="ProFundX admin panel." noIndex={true} />
       {/* Mobile sidebar backdrop */}
       {isMobile && sidebarOpen && (
         <div

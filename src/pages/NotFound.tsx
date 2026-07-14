@@ -1,11 +1,13 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Layout from '../components/Layout.tsx'
+import { SeoHead } from '../i18n/SeoHead'
 
 export default function NotFoundPage() {
   const { t } = useTranslation('common')
   return (
     <Layout>
+      <SeoHead title="Page Not Found" description="The page you're looking for doesn't exist." noIndex={true} />
       <div
         style={{
           display: 'flex',

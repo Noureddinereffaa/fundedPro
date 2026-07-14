@@ -4,6 +4,7 @@ import { authApi } from '../../utils/api.ts'
 import { useTranslation } from 'react-i18next'
 import Layout from '../../components/Layout.tsx'
 import { useToast } from '../../contexts/ToastContext.tsx'
+import { SeoHead } from '../../i18n/SeoHead'
 import type { ReferralStats } from '../../../shared/types'
 import { th, td } from '../../utils/cssConstants.ts'
 
@@ -61,6 +62,7 @@ export default function ReferralPage() {
 
   return (
     <Layout>
+      <SeoHead title="Referral Program" description="Earn rewards by referring traders to ProFundX." />
       <div style={{ maxWidth: 900 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e0e0e0', marginBottom: 24 }}>
           {t('referral.title')}

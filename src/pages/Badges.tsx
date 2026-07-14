@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import Layout from '../components/Layout'
 import { useBadges } from './hooks/useBadges'
+import { SeoHead } from '../i18n/SeoHead'
 import type { BadgeWithProgress, BadgeCategory } from '../../shared/types'
 
 const CATEGORY_ORDER: BadgeCategory[] = ['progression', 'volume', 'profit', 'streak', 'risk', 'consistency', 'special']
@@ -197,6 +198,7 @@ export default function BadgesPage() {
 
   return (
     <Layout>
+      <SeoHead title="Badges &amp; Achievements" description="Track your ProFundX badges and achievements as you progress as a funded trader." />
       <div style={{ padding: '24px', maxWidth: 960, margin: '0 auto', width: '100%' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>

@@ -5,6 +5,7 @@ import { createChart, LineSeries } from 'lightweight-charts'
 import type { PortfolioSummary } from '../../shared/types'
 import { accountApi } from '../utils/api'
 import Layout from '../components/Layout'
+import { SeoHead } from '../i18n/SeoHead'
 
 const format$ = (n: number) =>
   n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -122,6 +123,7 @@ function PortfolioPage() {
 
   return (
     <Layout>
+      <SeoHead title="Portfolio" description="Your ProFundX trading portfolio and performance analytics." />
       <div style={{ padding: '24px 32px', maxWidth: 1200, margin: '0 auto' }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>

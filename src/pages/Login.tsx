@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAuth } from '../contexts/AuthContext.tsx'
+import { SeoHead } from '../i18n/SeoHead'
 
 const loginSchema = z.object({
   email: z.string().email('login.invalidEmail'),
@@ -46,6 +47,7 @@ export default function LoginPage() {
         background: '#0a0e17',
       }}
     >
+      <SeoHead title="Sign In" description="Sign in to your ProFundX account to manage your funded trading accounts." />
       <div
         style={{
           width: 400,

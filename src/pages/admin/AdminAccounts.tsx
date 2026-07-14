@@ -3,6 +3,7 @@ import AdminLayout from './AdminLayout.tsx'
 import { adminApi } from '../../utils/api.ts'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../../contexts/ToastContext.tsx'
+import { SeoHead } from '../../i18n/SeoHead'
 import type { Account } from '../../../shared/types'
 import { th, pageBtn, editBtn } from '../../utils/cssConstants.ts'
 
@@ -80,6 +81,7 @@ export default function AdminAccountsPage() {
 
   return (
     <AdminLayout active="accounts">
+      <SeoHead title="Admin: Accounts" description="Manage trader accounts on ProFundX." noIndex={true} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e0e0e0', margin: 0 }}>{t('accounts.title')}</h1>
