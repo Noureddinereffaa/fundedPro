@@ -355,7 +355,12 @@ export class MarketDataService {
 
       try {
         const provider = await providerFactory.getProvider(name)
-        return await fn(provider, nativeSymbol)
+        const result = await fn(provider, nativeSymbol)
+        // Treat empty arrays as failures to trigger fallback
+        if (Array.isArray(result) && result.length === 0) {
+          throw new MarketDataError(name, sym.id, 'Empty result from provider', true)
+        }
+        return result
       } catch (err) {
         const mdErr = err instanceof MarketDataError
           ? err
