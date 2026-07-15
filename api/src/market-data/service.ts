@@ -10,7 +10,7 @@ import { MarketDataCache } from './cache.js'
 import { MarketDataError, AllProvidersFailedError, ProviderNotConnectedError } from './errors.js'
 import { marketDataPublisher } from './redis-pubsub.js'
 import { logger } from '../utils/logger.js'
-import { generateMockKlines } from './mockData.js'
+import { generateMockKlines, getMockConfig } from './mockData.js'
 import { RESOLUTION_SECONDS } from './types.js'
 
 interface SubscriptionManager {
@@ -95,12 +95,20 @@ export class MarketDataService {
     const cached = await this.cache.getTicker(symbol)
     if (cached) return cached
 
-    return this.withFallback<Ticker>(sym, undefined, async (provider, nativeSymbol) => {
-      const ticker = await provider.getTicker(nativeSymbol)
-      ticker.marketType = sym.marketType
-      await this.cache.setTicker(sym.id, ticker)
-      return ticker
-    })
+    try {
+      return await this.withFallback<Ticker>(sym, undefined, async (provider, nativeSymbol) => {
+        const ticker = await provider.getTicker(nativeSymbol)
+        ticker.marketType = sym.marketType
+        await this.cache.setTicker(sym.id, ticker)
+        return ticker
+      })
+    } catch (err) {
+      if (err instanceof AllProvidersFailedError) {
+        logger.warn(`MarketDataService: all providers failed for ${symbol}, returning mock ticker`)
+        return this.getMockTicker(sym)
+      }
+      throw err
+    }
   }
 
   async getOHLCV(
@@ -120,11 +128,19 @@ export class MarketDataService {
     const cached = await this.cache.getCandles(sym.id, effectiveResolution)
     if (cached && cached.length >= (limit || 500)) return cached
 
-    return this.withFallback<Candle[]>(sym, undefined, async (provider, nativeSymbol) => {
-      const candles = await provider.getOHLCV(nativeSymbol, effectiveResolution, from, to, limit)
-      await this.cache.setCandles(sym.id, effectiveResolution, candles)
-      return candles
-    })
+    try {
+      return await this.withFallback<Candle[]>(sym, undefined, async (provider, nativeSymbol) => {
+        const candles = await provider.getOHLCV(nativeSymbol, effectiveResolution, from, to, limit)
+        await this.cache.setCandles(sym.id, effectiveResolution, candles)
+        return candles
+      })
+    } catch (err) {
+      if (err instanceof AllProvidersFailedError) {
+        logger.warn(`MarketDataService: all providers failed for ${symbol}, returning mock candles`)
+        return this.getMockCandles(sym, effectiveResolution, from, to, limit)
+      }
+      throw err
+    }
   }
 
   async getOrderBook(symbol: string, limit?: number): Promise<OrderBook> {
@@ -357,7 +373,6 @@ export class MarketDataService {
       try {
         const provider = await providerFactory.getProvider(name)
         const result = await fn(provider, nativeSymbol)
-        // Treat empty arrays as failures to trigger fallback
         if (Array.isArray(result) && result.length === 0) {
           throw new MarketDataError(name, sym.id, 'Empty result from provider', true)
         }
@@ -372,18 +387,37 @@ export class MarketDataService {
       }
     }
 
-    // All providers failed - return mock data as last resort
-    logger.warn(`MarketDataService: all providers failed for ${sym.id}, returning mock data`)
-    return this.getMockCandles(sym, Resolution.D1, 0, 0, 500) as T
+    throw new AllProvidersFailedError(sym.id, errors)
   }
 
   private getMockCandles(sym: SymbolDefinition, resolution: Resolution, from?: number, to?: number, limit: number = 500): Candle[] {
     const toTs = to || Math.floor(Date.now() / 1000)
     const fromTs = from || (toTs - 30 * 86400)
-    const resSec = RESOLUTION_SECONDS[resolution] || 86400
-    const count = Math.min(limit, Math.floor((toTs - fromTs) / resSec) + 1)
     const symbol = sym.id.replace('/', '')
-return generateMockKlines(symbol, resolution, fromTs, toTs).slice(0, count)
+    return generateMockKlines(symbol, resolution, fromTs, toTs).slice(0, limit)
+  }
+
+  private getMockTicker(sym: SymbolDefinition): Ticker {
+    const symbol = sym.id.replace('/', '')
+    const config = getMockConfig(symbol)
+    const basePrice = config.price
+    const change = (Math.random() - 0.5) * 2
+    const price = basePrice + change * config.volatility
+    return {
+      symbol: sym.id,
+      price,
+      bid: price - config.spread / 2,
+      ask: price + config.spread / 2,
+      change: price - basePrice,
+      changePercent: ((price - basePrice) / basePrice) * 100,
+      high24h: price + config.volatility,
+      low24h: price - config.volatility,
+      volume: Math.floor(Math.random() * 10000),
+      quoteVolume: Math.floor(Math.random() * 10000),
+      timestamp: Date.now(),
+      provider: ProviderName.STOOQ,
+      marketType: sym.marketType,
+    }
   }
 }
 
