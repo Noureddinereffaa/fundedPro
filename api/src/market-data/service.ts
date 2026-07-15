@@ -48,79 +48,58 @@ export class MarketDataService {
     logger.info(`MarketDataService: initialized with providers [${configs.map(c => c.name).join(', ')}]`)
   }
 
-  async shutdown(): Promise<void> {
-    for (const [, unsubscribe] of this.providerSubscriptions) {
-      unsubscribe()
+  async getTickers(symbols: string[]): Promise<Map<string, Ticker>> {
+    const result = new Map<string, Ticker>()
+
+    const symbolsByMarketType = new Map<MarketType, string[]>()
+    for (const sym of symbols) {
+      const info = symbolRegistry.getBySymbol(sym)
+      if (info) {
+        const list = symbolsByMarketType.get(info.marketType) || []
+        list.push(sym)
+        symbolsByMarketType.set(info.marketType, list)
+      }
     }
-    this.providerSubscriptions.clear()
-    await providerFactory.disconnectAll()
-    await this.cache.disconnect()
-    await marketDataPublisher.disconnect()
-    this.initialized = false
-    logger.info('MarketDataService: shut down')
+
+    for (const [marketType, syms] of symbolsByMarketType) {
+      const fallbackProviders = DEFAULT_PROVIDER_PRIORITY[marketType]
+
+      for (const name of fallbackProviders) {
+        try {
+          const provider = await providerFactory.getProvider(name)
+          const nativeSymbols = syms.map(s => symbolRegistry.getBySymbol(s)?.providerSymbols[name]).filter(Boolean) as string[]
+          const tickers = await provider.getTickers(nativeSymbols)
+
+          for (const [nativeSym, ticker] of tickers) {
+            const sym = symbolRegistry.getByNativeSymbol(name, nativeSym)
+            if (sym) {
+              result.set(sym.id, ticker)
+              await this.cache.setTicker(sym.id, ticker)
+            }
+          }
+
+          if (tickers.size > 0) break
+        } catch (err) {
+          logger.error(`MarketDataService: batch ticker error: ${err}`)
+        }
+      }
+    }
+
+    return result
   }
 
-  async getTicker(symbol: string, preferProvider?: ProviderName): Promise<Ticker> {
+  async getTicker(symbol: string): Promise<Ticker> {
     const sym = symbolRegistry.getBySymbol(symbol)
     if (!sym) throw new MarketDataError(ProviderName.OPENBB, symbol, `Unknown symbol: ${symbol}`, false, 'UNKNOWN_SYMBOL')
 
-    const cached = await this.cache.getTicker(sym.id)
-    if (cached && Date.now() - cached.timestamp < 3000) return cached
+    const cached = await this.cache.getTicker(symbol)
+    if (cached) return cached
 
-    return this.withFallback<Ticker>(sym, preferProvider, async (provider, nativeSymbol) => {
+    return this.withFallback<Ticker>(sym, undefined, async (provider, nativeSymbol) => {
       const ticker = await provider.getTicker(nativeSymbol)
       await this.cache.setTicker(sym.id, ticker)
       return ticker
     })
-  }
-
-  async getTickers(symbols: string[]): Promise<Map<string, Ticker>> {
-    const result = new Map<string, Ticker>()
-    const uncached: SymbolDefinition[] = []
-
-    for (const symbol of symbols) {
-      const sym = symbolRegistry.getBySymbol(symbol)
-      if (!sym) continue
-      const cached = await this.cache.getTicker(sym.id)
-      if (cached && Date.now() - cached.timestamp < 3000) {
-        result.set(sym.id, cached)
-      } else {
-        uncached.push(sym)
-      }
-    }
-
-    if (uncached.length === 0) return result
-
-    const provider = await this.resolveProvider(uncached[0].marketType)
-    const nativeSymbols = uncached
-      .map(s => s.providerSymbols[provider.name])
-      .filter(Boolean) as string[]
-
-    try {
-      const tickers = await provider.getTickers(nativeSymbols)
-      for (const [nativeSym, ticker] of tickers) {
-        const sym = symbolRegistry.getByNativeSymbol(provider.name, nativeSym)
-        if (sym) {
-          result.set(sym.id, ticker)
-          await this.cache.setTicker(sym.id, ticker)
-        }
-      }
-    } catch (err) {
-      logger.error(`MarketDataService: batch ticker error: ${err}`)
-}
-
-    // All providers failed - return mock data as last resort
-    logger.warn(`MarketDataService: all providers failed for ${sym.id}, returning mock data`)
-    return this.getMockCandles(sym, resolution, from, to, limit)
-  }
-
-  private getMockCandles(sym: SymbolDefinition, resolution: Resolution, from?: number, to?: number, limit: number = 500): Candle[] {
-    const toTs = to || Math.floor(Date.now() / 1000)
-    const fromTs = from || (toTs - 30 * 86400)
-    const resSec = RESOLUTION_SECONDS[resolution] || 86400
-    const count = Math.min(limit, Math.floor((toTs - fromTs) / resSec) + 1)
-    const symbol = sym.id.replace('/', '')
-    return generateMockKlines(symbol, resolution, fromTs, toTs).slice(0, count)
   }
 
   async getOHLCV(
@@ -128,18 +107,17 @@ export class MarketDataService {
     resolution: Resolution,
     from?: number,
     to?: number,
-    limit: number = 500
+    limit?: number
   ): Promise<Candle[]> {
     const sym = symbolRegistry.getBySymbol(symbol)
     if (!sym) throw new MarketDataError(ProviderName.OPENBB, symbol, `Unknown symbol: ${symbol}`, false, 'UNKNOWN_SYMBOL')
 
-    // For non-crypto symbols, fall back to daily resolution if sub-daily requested
     const isCrypto = sym.marketType === MarketType.CRYPTO
     const isSubDaily = resolution !== Resolution.D1 && resolution !== Resolution.W1 && resolution !== Resolution.MN1
     const effectiveResolution = isCrypto || !isSubDaily ? resolution : Resolution.D1
 
     const cached = await this.cache.getCandles(sym.id, effectiveResolution)
-    if (cached && cached.length >= limit) return cached
+    if (cached && cached.length >= (limit || 500)) return cached
 
     return this.withFallback<Candle[]>(sym, undefined, async (provider, nativeSymbol) => {
       const candles = await provider.getOHLCV(nativeSymbol, effectiveResolution, from, to, limit)
@@ -206,16 +184,125 @@ export class MarketDataService {
     }
   }
 
-  getSymbolInfo(symbol: string): SymbolDefinition | undefined {
-    return symbolRegistry.getBySymbol(symbol)
+  subscribeOrderBook(symbol: string, callback: (book: OrderBook) => void): () => void {
+    const key = symbol.toUpperCase()
+    if (!this.subscriptions.orderbook.has(key)) {
+      this.subscriptions.orderbook.set(key, new Set())
+      this.startOrderBookSubscription(symbol)
+    }
+    this.subscriptions.orderbook.get(key)!.add(callback)
+
+    return () => {
+      const callbacks = this.subscriptions.orderbook.get(key)
+      if (callbacks) {
+        callbacks.delete(callback)
+        if (callbacks.size === 0) {
+          this.subscriptions.orderbook.delete(key)
+          this.stopProviderSubscription(`orderbook:${key}`)
+        }
+      }
+    }
   }
 
   getAllSymbols(): SymbolDefinition[] {
     return symbolRegistry.getAll()
   }
 
-  getSymbolsByMarketType(type: MarketType): SymbolDefinition[] {
-    return symbolRegistry.getByMarketType(type)
+  getSymbolInfo(symbol: string): SymbolDefinition | undefined {
+    return symbolRegistry.getBySymbol(symbol)
+  }
+
+  async startTickerSubscription(symbol: string): Promise<void> {
+    const sym = symbolRegistry.getBySymbol(symbol)
+    if (!sym) return
+
+    try {
+      const provider = await this.resolveProvider(sym.marketType)
+      const nativeSymbol = sym.providerSymbols[provider.name]
+      if (!nativeSymbol) return
+
+      const unsubscribe = provider.subscribeTicker([nativeSymbol], (ticker) => {
+        this.cache.setTicker(sym.id, ticker)
+        marketDataPublisher.publishTicker(ticker)
+        const callbacks = this.subscriptions.ticker.get(sym.id.toUpperCase())
+        if (callbacks) {
+          for (const cb of callbacks) cb(ticker)
+        }
+      })
+
+      this.providerSubscriptions.set(`ticker:${sym.id.toUpperCase()}`, unsubscribe)
+    } catch (err) {
+      logger.error(`MarketDataService: ticker subscription failed for ${symbol}: ${err}`)
+    }
+  }
+
+  async startOHLCVSubscription(symbol: string, resolution: Resolution): Promise<void> {
+    const sym = symbolRegistry.getBySymbol(symbol)
+    if (!sym) return
+
+    try {
+      const provider = await this.resolveProvider(sym.marketType)
+      const nativeSymbol = sym.providerSymbols[provider.name]
+      if (!nativeSymbol) return
+
+      const key = `${sym.id}:${resolution}`
+      const unsubscribe = provider.subscribeOHLCV([nativeSymbol], resolution, (candle) => {
+        this.cache.setCandles(sym.id, resolution, [candle])
+        marketDataPublisher.publishCandle(candle)
+        const callbacks = this.subscriptions.ohlcv.get(`${sym.id.toUpperCase()}:${resolution}`)
+        if (callbacks) {
+          for (const cb of callbacks) cb(candle)
+        }
+      })
+
+      this.providerSubscriptions.set(`ohlcv:${sym.id.toUpperCase()}:${resolution}`, unsubscribe)
+    } catch (err) {
+      logger.error(`MarketDataService: OHLCV subscription failed for ${symbol}: ${err}`)
+    }
+  }
+
+  async startOrderBookSubscription(symbol: string): Promise<void> {
+    const sym = symbolRegistry.getBySymbol(symbol)
+    if (!sym) return
+
+    try {
+      const provider = await this.resolveProvider(sym.marketType)
+      const nativeSymbol = sym.providerSymbols[provider.name]
+      if (!nativeSymbol) return
+
+      const unsubscribe = provider.subscribeOrderBook!(nativeSymbol, (book: OrderBook) => {
+        this.cache.setOrderBook(sym.id, book)
+        marketDataPublisher.publishOrderBook(sym.id, book)
+        const callbacks = this.subscriptions.orderbook.get(sym.id.toUpperCase())
+        if (callbacks) {
+          for (const cb of callbacks) cb(book)
+        }
+      })
+
+      if (unsubscribe) {
+        this.providerSubscriptions.set(`orderbook:${sym.id.toUpperCase()}`, unsubscribe)
+      }
+    } catch (err) {
+      logger.error(`MarketDataService: order book subscription failed for ${symbol}: ${err}`)
+    }
+  }
+
+  stopProviderSubscription(key: string): void {
+    const unsubscribe = this.providerSubscriptions.get(key)
+    if (unsubscribe) {
+      unsubscribe()
+      this.providerSubscriptions.delete(key)
+    }
+  }
+
+  async shutdown(): Promise<void> {
+    for (const [, unsubscribe] of this.providerSubscriptions) {
+      unsubscribe()
+    }
+    this.providerSubscriptions.clear()
+    await this.cache.disconnect()
+    await marketDataPublisher.disconnect()
+    this.initialized = false
   }
 
   private async resolveProvider(marketType: MarketType, prefer?: ProviderName): Promise<MarketDataProvider> {
@@ -279,69 +366,18 @@ export class MarketDataService {
       }
     }
 
-    throw new AllProvidersFailedError(sym.id, errors)
+    // All providers failed - return mock data as last resort
+    logger.warn(`MarketDataService: all providers failed for ${sym.id}, returning mock data`)
+    return this.getMockCandles(sym, Resolution.D1, 0, 0, 500) as T
   }
 
-  private async getMockCandles(symbol: string, resolution: Resolution, from?: number, to?: number, limit: number = 500): Promise<Candle[]> {
-    const toTime = to || Math.floor(Date.now() / 1000)
-    const fromTime = from || Math.floor(Date.now() / 1000) - 86400 * 30
-    const resolutionStr = RESOLUTION_SECONDS[resolution] ? resolution : 'D1'
-    return generateMockKlines(symbol, resolutionStr, from || toTime - 86400 * 30, toTime)
-      .slice(0, limit)
-  }
-  }
-
-  private async startTickerSubscription(symbol: string): Promise<void> {
-    const sym = symbolRegistry.getBySymbol(symbol)
-    if (!sym) return
-
-    try {
-      const provider = await this.resolveProvider(sym.marketType)
-      const nativeSymbol = sym.providerSymbols[provider.name]
-      if (!nativeSymbol) return
-
-      const unsubscribe = provider.subscribeTicker([nativeSymbol], (ticker) => {
-        this.cache.setTicker(sym.id, ticker)
-        marketDataPublisher.publishTicker(ticker)
-        const callbacks = this.subscriptions.ticker.get(sym.id.toUpperCase())
-        if (callbacks) {
-          for (const cb of callbacks) cb(ticker)
-        }
-      })
-      this.providerSubscriptions.set(`ticker:${sym.id.toUpperCase()}`, unsubscribe)
-    } catch (err) {
-      logger.error(`MarketDataService: ticker subscription failed for ${symbol}: ${err}`)
-    }
-  }
-
-  private async startOHLCVSubscription(symbol: string, resolution: Resolution): Promise<void> {
-    const sym = symbolRegistry.getBySymbol(symbol)
-    if (!sym) return
-
-    try {
-      const provider = await this.resolveProvider(sym.marketType)
-      const nativeSymbol = sym.providerSymbols[provider.name]
-      if (!nativeSymbol) return
-
-      const unsubscribe = provider.subscribeOHLCV([nativeSymbol], resolution, (candle) => {
-        marketDataPublisher.publishCandle(candle)
-        const callbacks = this.subscriptions.ohlcv.get(`${sym.id.toUpperCase()}:${resolution}`)
-        if (callbacks) {
-          for (const cb of callbacks) cb(candle)
-        }
-      })
-      this.providerSubscriptions.set(`ohlcv:${sym.id.toUpperCase()}:${resolution}`, unsubscribe)
-    } catch (err) {
-      logger.error(`MarketDataService: OHLCV subscription failed for ${symbol}: ${err}`)
-    }
-  }
-
-  private stopProviderSubscription(key: string): void {
-    const unsubscribe = this.providerSubscriptions.get(key)
-    if (unsubscribe) {
-      unsubscribe()
-      this.providerSubscriptions.delete(key)
-    }
+  private getMockCandles(sym: SymbolDefinition, resolution: Resolution, from?: number, to?: number, limit: number = 500): Candle[] {
+    const toTs = to || Math.floor(Date.now() / 1000)
+    const fromTs = from || (toTs - 30 * 86400)
+    const resSec = RESOLUTION_SECONDS[resolution] || 86400
+    const count = Math.min(limit, Math.floor((toTs - fromTs) / resSec) + 1)
+    const symbol = sym.id.replace('/', '')
+return generateMockKlines(symbol, resolution, fromTs, toTs).slice(0, count)
   }
 }
 

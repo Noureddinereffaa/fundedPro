@@ -1,4 +1,4 @@
-import type { Candle } from './types.js'
+import type { Candle, Resolution } from './types.js'
 
 export const MOCK_PRICES: Record<string, { price: number; spread: number; volatility: number }> = {
   BTCUSDT: { price: 62850.0, spread: 1.0, volatility: 200.0 },
@@ -15,7 +15,7 @@ export const MOCK_PRICES: Record<string, { price: number; spread: number; volati
   UNIUSDT: { price: 3.26, spread: 0.01, volatility: 0.1 },
 }
 
-function resolutionToSeconds(resolution: string): number {
+function resolutionToSeconds(resolution: Resolution): number {
   const n = Number(resolution)
   if (!isNaN(n) && n > 0) return n
   const map: Record<string, number> = {
@@ -28,7 +28,7 @@ function resolutionToSeconds(resolution: string): number {
 
 export function getMockConfig(symbol: string): { price: number; spread: number; volatility: number } {
   if (MOCK_PRICES[symbol]) return MOCK_PRICES[symbol]
-  const base = symbol.replace('USDT', '').replace('USD', '').replace('/', '').replace('=X', '').replace('.US', '')
+  const base = symbol.replace('USDT', '').replace('USD', '')
   const seed = Math.abs(hashString(base))
   const hashNorm = (seed % 1000) / 1000
   const lowPriceTokens = new Set(['SHIB', 'PEPE', 'BONK', 'FLOKI', 'BOME', 'NOT'])
@@ -45,7 +45,7 @@ export function getMockConfig(symbol: string): { price: number; spread: number; 
   return { price, spread: price * 0.001, volatility: price * 0.1 }
 }
 
-export function generateMockKlines(symbol: string, resolution: string, from: number, to: number): Candle[] {
+export function generateMockKlines(symbol: string, resolution: Resolution, from: number, to: number): Candle[] {
   const config = getMockConfig(symbol)
 
   const interval = resolutionToSeconds(resolution)
@@ -72,6 +72,7 @@ export function generateMockKlines(symbol: string, resolution: string, from: num
 
     const session = new Date(curTime * 1000).getUTCDay()
 
+    // Gap at session start
     if (session !== lastSessionDay) {
       lastSessionDay = session
       if (result.length > 0) {
@@ -81,6 +82,7 @@ export function generateMockKlines(symbol: string, resolution: string, from: num
       }
     }
 
+    // Trend with longer persistence
     trendTimer++
     if (trendTimer > 5 + Math.floor(nextRandom() * 15)) {
       trendAngle += (nextRandom() - 0.5) * 0.6
@@ -114,139 +116,9 @@ export function generateMockKlines(symbol: string, resolution: string, from: num
     const volume = Math.floor(volumeBase * volSpike)
 
     result.push({
-      time: curTime,
-      open: roundToSpread(open, spread),
-      high: roundToSpread(high, spread),
-      low: roundToSpread(low, spread),
-      close: roundToSpread(close, spread),
-      volume,
-    })
-  }
-
-  return result
-}
-
-function resolutionToSeconds(resolution: string): number {
-  const n = Number(resolution)
-  if (!isNaN(n) && n > 0) return n
-  const map: Record<string, number> = {
-    D: 86400,
-    W: 604800,
-    M: 2592000,
-  }
-  return map[resolution] || 3600
-}
-
-function roundToSpread(value: number, spread: number): number {
-  const precision = Math.round(-Math.log10(spread))
-  const factor = Math.pow(10, precision)
-  return Math.round(value * factor) / factor
-}
-
-function hashString(str: string): number {
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i)
-    hash = (hash << 5) - hash + char
-    hash = hash & hash
-  }
-  return Math.abs(hash)
-}
-
-function nextRandom(): number {
-  return Math.random()
-}
-
-const result: { time: number; open: number; high: number; low: number; close: number; volume: number }[] = []
-const change = 0
-const result: Candle[] = []
-let price = 0
-const change = 0
-const spread = 0
-const vol = 0
-const time = 0
-const interval = 0
-const count = 0
-const rngState = 0
-const config = { price: 0, spread: 0, volatility: 0 }
-const spread = 0
-const vol = 0
-const price = 0
-const time = 0
-const interval = 0
-const count = 0
-const rngState = 0
-
-export function generateMockKlines(symbol: string, resolution: string, from: number, to: number): Candle[] {
-  const config = getMockConfig(symbol)
-
-  const interval = resolutionToSeconds(resolution)
-  const count = Math.min(Math.floor((to - from) / interval), 20000)
-  const result: Candle[] = []
-  const seed = hashString(symbol)
-  let rngState = seed
-
-  function nextRandom(): number {
-    rngState = (rngState * 1664525 + 1013904223) & 0xffffffff
-    return (rngState >>> 0) / 4294967296
-  }
-
-  let price = config.price
-  const spread = config.spread
-  const vol = config.volatility
-
-  const time = from
-  let trendAngle = 0
-  let trendTimer = 0
-  let lastSessionDay = -1
-  for (let i = 0; i < count; i++) {
-    const curTime = time + i * interval
-
-    const session = new Date(curTime * 1000).getUTCDay()
-
-    if (session !== lastSessionDay) {
-      lastSessionDay = session
-      if (result.length > 0) {
-        const gapSize = (nextRandom() - 0.5) * vol * 2
-        price = result[result.length - 1].close + gapSize
-        if (price <= 0) price = config.price
-      }
-    }
-
-    trendTimer++
-    if (trendTimer > 5 + Math.floor(nextRandom() * 15)) {
-      trendAngle += (nextRandom() - 0.5) * 0.6
-      trendAngle = Math.max(-1, Math.min(1, trendAngle))
-      trendTimer = 0
-    }
-    const trend = trendAngle * vol * 0.4
-
-    const noise = (nextRandom() - 0.5) * vol * 1.2
-    const change = trend + noise
-    price = price + change
-    if (price <= 0) price = config.price
-
-    const open = price
-    const bodyRange = nextRandom() * vol * 0.5
-    const wickTop = nextRandom() * vol * 0.3
-    const wickBottom = nextRandom() * vol * 0.3
-    const direction = nextRandom() > 0.5 ? 1 : -1
-
-    const bodyHigh = direction > 0 ? bodyRange : 0
-    const bodyLow = direction < 0 ? bodyRange : 0
-    let high = open + Math.max(wickTop, bodyHigh * 1.1)
-    let low = open - Math.max(wickBottom, bodyLow * 1.1)
-    let close = open + direction * bodyRange
-
-    high = Math.max(high, open, close)
-    low = Math.min(low, open, close)
-
-    const volumeBase = 1000 + nextRandom() * 9000
-    const volSpike = Math.abs(change / vol) > 0.8 ? 2 + nextRandom() * 3 : 1
-    const volume = Math.floor(volumeBase * volSpike)
-
-    result.push({
-      time: curTime,
+      symbol,
+      resolution,
+      timestamp: curTime,
       open: roundToSpread(open, spread),
       high: roundToSpread(high, spread),
       low: roundToSpread(low, spread),
