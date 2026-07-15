@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { marketDataService } from '../market-data/index.js'
 import { z } from 'zod'
+import { Resolution } from '../market-data/types.js'
 
 const router = Router()
 
@@ -12,13 +13,24 @@ const candleSchema = z.object({
   limit: z.coerce.number().min(1).max(5000).optional(),
 })
 
+// Normalize resolution from frontend format (D, W, M) to backend format (D1, W1, MN1)
+function normalizeResolution(resolution: string): string {
+  const map: Record<string, Resolution> = {
+    'D': Resolution.D1,
+    'W': Resolution.W1,
+    'M': Resolution.MN1,
+  }
+  return map[resolution] || resolution
+}
+
 router.get('/candles', async (req: Request, res: Response) => {
   try {
     console.log('[MarketData] candles query:', req.query)
     const { symbol, resolution, from, to, limit } = candleSchema.parse(req.query)
-    console.log('[MarketData] parsed:', { symbol, resolution, from, to, limit })
-    const candles = await marketDataService.getOHLCV(symbol, resolution as any, from, to, limit)
-    res.json({ symbol, resolution, candles })
+    const normalizedResolution = normalizeResolution(resolution)
+    console.log('[MarketData] parsed:', { symbol, resolution: normalizedResolution, from, to, limit })
+    const candles = await marketDataService.getOHLCV(symbol, normalizedResolution as any, from, to, limit)
+    res.json({ symbol, resolution: normalizedResolution, candles })
   } catch (err) {
     console.error('[MarketData] candles error:', err)
     res.status(400).json({ error: 'Invalid parameters', details: err instanceof Error ? err.message : String(err) })
