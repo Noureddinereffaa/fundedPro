@@ -73,6 +73,8 @@ export class MarketDataService {
           for (const [nativeSym, ticker] of tickers) {
             const sym = symbolRegistry.getByNativeSymbol(name, nativeSym)
             if (sym) {
+              ticker.symbol = sym.id
+              ticker.marketType = sym.marketType
               result.set(sym.id, ticker)
               await this.cache.setTicker(sym.id, ticker)
             }
@@ -98,6 +100,7 @@ export class MarketDataService {
     try {
       return await this.withFallback<Ticker>(sym, undefined, async (provider, nativeSymbol) => {
         const ticker = await provider.getTicker(nativeSymbol)
+        ticker.symbol = sym.id
         ticker.marketType = sym.marketType
         await this.cache.setTicker(sym.id, ticker)
         return ticker
@@ -238,16 +241,35 @@ export class MarketDataService {
       const nativeSymbol = sym.providerSymbols[provider.name]
       if (!nativeSymbol) return
 
-      const unsubscribe = provider.subscribeTicker([nativeSymbol], (ticker) => {
+      const onTick = (ticker: Ticker) => {
+        ticker.symbol = sym.id
+        ticker.marketType = sym.marketType
         this.cache.setTicker(sym.id, ticker)
         marketDataPublisher.publishTicker(ticker)
         const callbacks = this.subscriptions.ticker.get(sym.id.toUpperCase())
         if (callbacks) {
           for (const cb of callbacks) cb(ticker)
         }
-      })
+      }
 
-      this.providerSubscriptions.set(`ticker:${sym.id.toUpperCase()}`, unsubscribe)
+      // If provider supports real-time streaming, use its native subscription
+      // Otherwise, fall back to polling ticker endpoint every 5 seconds
+      if (provider.capabilities.realtimeStream) {
+        const unsubscribe = provider.subscribeTicker([nativeSymbol], onTick)
+        this.providerSubscriptions.set(`ticker:${sym.id.toUpperCase()}`, unsubscribe)
+      } else {
+        const pollId = setInterval(async () => {
+          try {
+            const ticker = await provider.getTicker(nativeSymbol)
+            ticker.symbol = sym.id
+            ticker.marketType = sym.marketType
+            onTick(ticker)
+          } catch (err) {
+            logger.warn(`MarketDataService: ticker poll failed for ${symbol}: ${err}`)
+          }
+        }, 5000)
+        this.providerSubscriptions.set(`ticker:${sym.id.toUpperCase()}`, () => clearInterval(pollId))
+      }
     } catch (err) {
       logger.error(`MarketDataService: ticker subscription failed for ${symbol}: ${err}`)
     }

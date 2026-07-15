@@ -6,6 +6,23 @@ import {
 } from '../types.js'
 import { MarketDataError, ProviderNotConnectedError } from '../errors.js'
 
+async function fetchWithRetry(url: string, retries: number = 3): Promise<Response> {
+  const providerName = ProviderName.STOOQ
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
+    if (resp.ok) return resp
+    if (resp.status === 429 || resp.status >= 500) {
+      if (attempt < retries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1) + Math.random() * 1000, 10000)
+        await new Promise(resolve => setTimeout(resolve, delay))
+        continue
+      }
+    }
+    throw new MarketDataError(providerName, url, `HTTP ${resp.status}`, true)
+  }
+  throw new MarketDataError(providerName, url, 'All retries exhausted', true)
+}
+
 export class StooqProvider implements MarketDataProvider {
   readonly name = ProviderName.STOOQ
   readonly capabilities: ProviderCapabilities
@@ -38,8 +55,7 @@ export class StooqProvider implements MarketDataProvider {
   async getTicker(symbol: string): Promise<Ticker> {
     this.ensureConnected()
     const url = `https://stooq.com/q/l/?s=${encodeURIComponent(symbol)}&f=sd2t2ohlcvn&h&e=json`
-    const resp = await fetch(url)
-    if (!resp.ok) throw new MarketDataError(this.name, symbol, `HTTP ${resp.status}`, true)
+    const resp = await fetchWithRetry(url)
 
     const data = await resp.json() as any
     const quote = data?.symbols?.[0]
@@ -77,8 +93,7 @@ export class StooqProvider implements MarketDataProvider {
     this.ensureConnected()
     if (resolution === Resolution.D1 || resolution === Resolution.W1 || resolution === Resolution.MN1) {
       const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(symbol)}&i=${this.stooqInterval(resolution)}&d1=${this.dateParam(from)}&d2=${this.dateParam(to)}`
-      const resp = await fetch(url)
-      if (!resp.ok) throw new MarketDataError(this.name, symbol, `HTTP ${resp.status}`, true)
+      const resp = await fetchWithRetry(url)
 
       const text = await resp.text()
       const lines = text.trim().split('\n').slice(1)

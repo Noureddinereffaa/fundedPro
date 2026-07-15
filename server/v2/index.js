@@ -42,6 +42,7 @@ function connectRedis() {
   sub.on('error', (err) => console.warn('[WSv2] Redis sub error:', err.message))
   pub.on('error', (err) => console.warn('[WSv2] Redis pub error:', err.message))
 
+  // Handle exact channel messages (tickers)
   sub.on('message', (channel, message) => {
     try {
       const data = JSON.parse(message)
@@ -58,7 +59,28 @@ function connectRedis() {
         }
       }
     } catch (err) {
-      console.warn('[WSv2] Redis message parse error:', err.message)
+      console.warn('[WSv2] Redis message error:', err.message)
+    }
+  })
+
+  // Handle pattern channel messages (candles via PSUBSCRIBE)
+  sub.on('pmessage', (pattern, channel, message) => {
+    try {
+      const data = JSON.parse(message)
+      const symbol = data.symbol
+      if (!symbol) return
+
+      const clients = subscriptions.get(symbol.toUpperCase())
+      if (!clients || clients.size === 0) return
+
+      const payload = JSON.stringify(data)
+      for (const ws of clients) {
+        if (ws.readyState === 1) {
+          ws.send(payload)
+        }
+      }
+    } catch (err) {
+      console.warn('[WSv2] Redis pmessage error:', err.message)
     }
   })
 }
@@ -70,8 +92,9 @@ const wss = new WebSocketServer({ server: httpServer })
 
 // Map<symbol_upper, Set<WebSocket>>
 const subscriptions = new Map()
-// Map<symbol_upper, count>
-const redisSubCount = new Map()
+// Refcounts for Redis subscriptions
+const tickerSubCount = new Map()  // exact SUBSCRIBE count per symbol
+const candleSubCount = new Map()  // pattern PSUBSCRIBE count per pattern
 
 // ── Connection handler ─────────────────────────────────────────
 
@@ -108,7 +131,8 @@ wss.on('connection', (ws) => {
         clients.delete(ws)
         if (clients.size === 0) {
           subscriptions.delete(symbol)
-          removeRedisSubscription(symbol)
+          removeTickerSubscription(symbol)
+          removeCandleSubscription(symbol)
         }
       }
     }
@@ -122,6 +146,7 @@ wss.on('connection', (ws) => {
 function handleSubscribe(ws, msg) {
   const rawSymbols = msg.symbols || msg.symbol
   const symbols = Array.isArray(rawSymbols) ? rawSymbols : [rawSymbols]
+  const isCandle = !!msg.interval
 
   for (const symbol of symbols) {
     const key = symbol.toUpperCase()
@@ -131,7 +156,11 @@ function handleSubscribe(ws, msg) {
     }
     subscriptions.get(key).add(ws)
 
-    addRedisSubscription(key)
+    if (isCandle) {
+      addCandleSubscription(key)
+    } else {
+      addTickerSubscription(key)
+    }
 
     // Send an initial confirmation
     if (ws.readyState === 1) {
@@ -143,6 +172,7 @@ function handleSubscribe(ws, msg) {
 function handleUnsubscribe(ws, msg) {
   const rawSymbols = msg.symbols || msg.symbol
   const symbols = Array.isArray(rawSymbols) ? rawSymbols : [rawSymbols]
+  const isCandle = !!msg.interval
 
   for (const symbol of symbols) {
     const key = symbol.toUpperCase()
@@ -151,34 +181,65 @@ function handleUnsubscribe(ws, msg) {
       clients.delete(ws)
       if (clients.size === 0) {
         subscriptions.delete(key)
-        removeRedisSubscription(key)
+        if (isCandle) {
+          removeCandleSubscription(key)
+        } else {
+          removeTickerSubscription(key)
+        }
       }
     }
   }
 }
 
-function addRedisSubscription(symbol) {
+// Ticker subscriptions use exact Redis SUBSCRIBE
+function addTickerSubscription(symbol) {
   if (!sub) return
   const key = symbol.toUpperCase()
-  const count = redisSubCount.get(key) || 0
+  const count = tickerSubCount.get(key) || 0
   if (count === 0) {
-    // Subscribe to both ticker and candle channels
-    sub.subscribe(`market:ticker:${key}`, `market:candle:${key}:*`)
-      .catch(err => console.warn(`[WSv2] Redis subscribe error for ${key}:`, err.message))
+    sub.subscribe(`market:ticker:${key}`)
+      .catch(err => console.warn(`[WSv2] ticker subscribe error for ${key}:`, err.message))
   }
-  redisSubCount.set(key, count + 1)
+  tickerSubCount.set(key, count + 1)
 }
 
-function removeRedisSubscription(symbol) {
+function removeTickerSubscription(symbol) {
   if (!sub) return
   const key = symbol.toUpperCase()
-  const count = redisSubCount.get(key) || 1
+  const count = tickerSubCount.get(key) || 1
   if (count <= 1) {
-    redisSubCount.delete(key)
-    sub.unsubscribe(`market:ticker:${key}`, `market:candle:${key}:*`)
+    tickerSubCount.delete(key)
+    sub.unsubscribe(`market:ticker:${key}`)
       .catch(() => {})
   } else {
-    redisSubCount.set(key, count - 1)
+    tickerSubCount.set(key, count - 1)
+  }
+}
+
+// Candle subscriptions use Redis PSUBSCRIBE for pattern matching
+function addCandleSubscription(symbol) {
+  if (!sub) return
+  const key = symbol.toUpperCase()
+  const pattern = `market:candle:${key}:*`
+  const count = candleSubCount.get(pattern) || 0
+  if (count === 0) {
+    sub.psubscribe(pattern)
+      .catch(err => console.warn(`[WSv2] candle psubscribe error for ${key}:`, err.message))
+  }
+  candleSubCount.set(pattern, count + 1)
+}
+
+function removeCandleSubscription(symbol) {
+  if (!sub) return
+  const key = symbol.toUpperCase()
+  const pattern = `market:candle:${key}:*`
+  const count = candleSubCount.get(pattern) || 1
+  if (count <= 1) {
+    candleSubCount.delete(pattern)
+    sub.punsubscribe(pattern)
+      .catch(() => {})
+  } else {
+    candleSubCount.set(pattern, count - 1)
   }
 }
 

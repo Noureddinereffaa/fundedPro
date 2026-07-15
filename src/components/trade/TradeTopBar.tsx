@@ -33,8 +33,8 @@ const INTERVAL_GROUPS = [
   { label: '1H', value: '3600' },
   { label: '2H', value: '7200' },
   { label: '4H', value: '14400' },
-  { label: '1D', value: 'D' },
-  { label: '1W', value: 'W' },
+  { label: '1D', value: '1d' },
+  { label: '1W', value: '1w' },
 ]
 
 export function TradeTopBar({

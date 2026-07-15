@@ -102,7 +102,7 @@ function createCryptoSymbol(
   precision: number, minLot: number, lotStep: number,
   ccxtId?: string
 ): SymbolDefinition {
-  const id = `${base}/${quote}`
+  const id = `${base}${quote}`
   return {
     id,
     symbol: id,
@@ -131,7 +131,7 @@ function createForexSymbol(
   base: string, quote: string, name: string,
   precision: number, pipValue: number
 ): SymbolDefinition {
-  const id = `${base}/${quote}`
+  const id = `${base}${quote}`
   return {
     id,
     symbol: id,
@@ -160,23 +160,23 @@ function createForexSymbol(
 }
 
 function createMetalSymbol(
-  base: string, name: string, precision: number
+  metalCode: string, base: string, name: string, precision: number,
+  contractSize: number = 100
 ): SymbolDefinition {
-  const id = `XAU/${base}`
-  const symbolName = base === 'USD' ? `Gold / ${base}` : `Silver / ${base}`
+  const id = `${metalCode}${base}`
   return {
-    id: `XAU/${base}`,
-    symbol: `XAU/${base}`,
-    name: symbolName,
+    id,
+    symbol: id,
+    name: `${name} / ${base}`,
     description: `${name} spot price in ${base}`,
     marketType: MarketType.METALS,
-    baseCurrency: 'XAU',
+    baseCurrency: metalCode,
     quoteCurrency: base,
     precision,
     minLot: 0.01,
     lotStep: 0.01,
-    pipValue: 0.01,
-    contractSize: 100,
+    pipValue: metalCode === 'XAG' ? 0.001 : 0.01,
+    contractSize,
     sessionHours: [
       { open: '23:00', close: '24:00', timezone: 'UTC' },
       { open: '00:00', close: '23:00', timezone: 'UTC' },
@@ -264,22 +264,18 @@ const FOREX_SYMBOLS: SymbolDefinition[] = [
   createForexSymbol('EUR', 'AUD', 'Euro / Australian Dollar', 5, 0.0001),
   createForexSymbol('GBP', 'CHF', 'British Pound / Swiss Franc', 5, 0.0001),
   createForexSymbol('EUR', 'NOK', 'Euro / Norwegian Krone', 4, 0.0001),
+  createForexSymbol('EUR', 'CAD', 'Euro / Canadian Dollar', 5, 0.0001),
+  createForexSymbol('AUD', 'NZD', 'Australian Dollar / New Zealand Dollar', 5, 0.0001),
+  createForexSymbol('USD', 'SGD', 'US Dollar / Singapore Dollar', 4, 0.0001),
+  createForexSymbol('USD', 'HKD', 'US Dollar / Hong Kong Dollar', 4, 0.0001),
 ]
 
 const METAL_SYMBOLS: SymbolDefinition[] = [
-  createMetalSymbol('USD', 'Gold', 2),
+  createMetalSymbol('XAU', 'USD', 'Gold', 2),
+  createMetalSymbol('XAG', 'USD', 'Silver', 3, 100),
   {
-    ...createMetalSymbol('USD', 'Silver', 3),
-    symbol: 'XAG/USD',
-    id: 'XAG/USD',
-    name: 'Silver / USD',
-    description: 'Silver spot price in USD',
-    baseCurrency: 'XAG',
-    pipValue: 0.001,
-  },
-  {
-    id: 'XPT/USD',
-    symbol: 'XPT/USD',
+    id: 'XPTUSD',
+    symbol: 'XPTUSD',
     name: 'Platinum / USD',
     description: 'Platinum spot price in USD',
     marketType: MarketType.METALS,
@@ -298,8 +294,8 @@ const METAL_SYMBOLS: SymbolDefinition[] = [
     isActive: true,
   },
   {
-    id: 'XPD/USD',
-    symbol: 'XPD/USD',
+    id: 'XPDUSD',
+    symbol: 'XPDUSD',
     name: 'Palladium / USD',
     description: 'Palladium spot price in USD',
     marketType: MarketType.METALS,
@@ -320,14 +316,14 @@ const METAL_SYMBOLS: SymbolDefinition[] = [
 ]
 
 const INDEX_SYMBOLS: SymbolDefinition[] = [
-  createIndexSymbol('SPX', 'S&P 500', 'Standard & Poor\'s 500 Index', 2, 0.1, '^GSPC', 'SPX.US'),
-  createIndexSymbol('NDX', 'Nasdaq 100', 'Nasdaq 100 Index', 2, 0.1, '^IXIC', 'NDX.US'),
-  createIndexSymbol('DJI', 'Dow Jones', 'Dow Jones Industrial Average', 2, 0.1, '^DJI', 'DJI.US'),
-  createIndexSymbol('FTSE', 'FTSE 100', 'FTSE 100 Index', 2, 0.1, '^FTSE', 'UKX.UK'),
-  createIndexSymbol('DAX', 'DAX 40', 'German DAX 40 Index', 2, 0.1, '^GDAXI', 'DAX.DE'),
-  createIndexSymbol('NIKKEI', 'Nikkei 225', 'Nikkei 225 Index', 0, 1, '^N225', 'NI225.JP'),
-  createIndexSymbol('HSI', 'Hang Seng', 'Hang Seng Index', 0, 1, '^HSI', 'HSI.HK'),
-  createIndexSymbol('ASX200', 'ASX 200', 'Australian S&P/ASX 200 Index', 2, 0.1, '^AXJO', 'XJO.AU'),
+  createIndexSymbol('SPX500', 'S&P 500', 'Standard & Poor\'s 500 Index', 2, 0.1, '^GSPC', 'SPX.US'),
+  createIndexSymbol('NASDAQ100', 'Nasdaq 100', 'Nasdaq 100 Index', 2, 0.1, '^NDX', 'NDX.US'),
+  createIndexSymbol('US30', 'Dow Jones', 'Dow Jones Industrial Average', 2, 0.1, '^DJI', 'DJI.US'),
+  createIndexSymbol('FTSE100', 'FTSE 100', 'FTSE 100 Index', 2, 0.1, '^FTSE', 'UKX.UK'),
+  createIndexSymbol('DAX40', 'DAX 40', 'German DAX 40 Index', 2, 0.1, '^GDAXI', 'DAX.DE'),
+  createIndexSymbol('NIKKEI225', 'Nikkei 225', 'Nikkei 225 Index', 0, 1, '^N225', 'NI225.JP'),
+  createIndexSymbol('HANGSENG', 'Hang Seng', 'Hang Seng Index', 0, 1, '^HSI', 'HSI.HK'),
+  createIndexSymbol('AU200', 'ASX 200', 'Australian S&P/ASX 200 Index', 2, 0.1, '^AXJO', 'XJO.AU'),
   createIndexSymbol('VIX', 'VIX', 'CBOE Volatility Index', 2, 0.01, '^VIX', 'VIX.US'),
   createIndexSymbol('IBOV', 'IBOVESPA', 'Brazilian IBOVESPA Index', 0, 1, '^BVSP', 'IBOV.BR'),
 ]

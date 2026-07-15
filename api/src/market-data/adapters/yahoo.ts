@@ -15,6 +15,24 @@ function yahooMarketType(symbol: string): MarketType {
   return MarketType.STOCKS
 }
 
+// Fetch with exponential backoff for rate-limit handling
+async function fetchWithRetry(url: string, retries: number = 3): Promise<Response> {
+  const providerName = ProviderName.YAHOO
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
+    if (resp.ok) return resp
+    if (resp.status === 429 || resp.status >= 500) {
+      if (attempt < retries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1) + Math.random() * 1000, 10000)
+        await new Promise(resolve => setTimeout(resolve, delay))
+        continue
+      }
+    }
+    throw new MarketDataError(providerName, url, `HTTP ${resp.status}`, true)
+  }
+  throw new MarketDataError(providerName, url, 'All retries exhausted', true)
+}
+
 export class YahooFinanceProvider implements MarketDataProvider {
   readonly name = ProviderName.YAHOO
   readonly capabilities: ProviderCapabilities
@@ -57,8 +75,7 @@ export class YahooFinanceProvider implements MarketDataProvider {
   async getTicker(symbol: string): Promise<Ticker> {
     this.ensureConnected()
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`
-    const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
-    if (!resp.ok) throw new MarketDataError(this.name, symbol, `HTTP ${resp.status}`, true)
+    const resp = await fetchWithRetry(url)
 
     const data = await resp.json() as any
     const result = data?.chart?.result?.[0]
@@ -104,8 +121,7 @@ export class YahooFinanceProvider implements MarketDataProvider {
     const interval = this.yahooInterval(resolution)
 
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?period1=${period1}&period2=${period2}&interval=${interval}`
-    const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
-    if (!resp.ok) throw new MarketDataError(this.name, symbol, `HTTP ${resp.status}`, true)
+    const resp = await fetchWithRetry(url)
 
     const data = await resp.json() as any
     const result = data?.chart?.result?.[0]
@@ -133,8 +149,12 @@ export class YahooFinanceProvider implements MarketDataProvider {
 
   async searchSymbols(query: string, _marketType?: MarketType): Promise<SymbolDefinition[]> {
     const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=20&newsCount=0`
-    const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
-    if (!resp.ok) return []
+    let resp: Response
+    try {
+      resp = await fetchWithRetry(url)
+    } catch {
+      return []
+    }
 
     const data = await resp.json() as any
     return (data.quotes || []).map((q: { symbol: string; shortname?: string; longname?: string; quoteType?: string; exchange?: string }) => ({

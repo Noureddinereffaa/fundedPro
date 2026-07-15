@@ -32,7 +32,9 @@ vi.mock('../utils/klineCache', () => ({
 }))
 
 vi.mock('../utils/marketData', () => ({
+  ALL_SYMBOLS: [{ symbol: 'EURUSD', type: 'forex', digits: 5, name: 'EUR/USD' }],
   getMarketInfo: vi.fn(() => ({ type: 'forex', digits: 5, name: 'EUR/USD' })),
+  getLookbackDays: vi.fn(() => 30),
 }))
 
 vi.mock('../utils/marketHours', () => ({
