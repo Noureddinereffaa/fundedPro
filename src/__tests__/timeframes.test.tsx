@@ -148,10 +148,13 @@ describe('getLookbackDays', () => {
     expect(getLookbackDays('43200')).toBe(1460)
   })
 
-  it('returns correct values for D, W, M', () => {
+  it('returns correct values for D, W, M (both old and new formats)', () => {
     expect(getLookbackDays('D')).toBe(730)
+    expect(getLookbackDays('1d')).toBe(730)
     expect(getLookbackDays('W')).toBe(1460)
+    expect(getLookbackDays('1w')).toBe(1460)
     expect(getLookbackDays('M')).toBe(3650)
+    expect(getLookbackDays('1M')).toBe(3650)
   })
 
   it('returns 1 for unknown resolution', () => {

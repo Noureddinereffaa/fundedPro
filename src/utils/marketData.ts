@@ -31,13 +31,11 @@ export function getLookbackDays(resolution: string): number {
   if (resolution === '5s') return 0.05
   if (resolution === '15s') return 0.1
   if (resolution === '30s') return 0.3
+  if (resolution === '1d' || resolution === 'D') return 730
+  if (resolution === '1w' || resolution === 'W') return 1460
+  if (resolution === '1M' || resolution === 'M') return 3650
   const n = parseInt(resolution)
-  if (isNaN(n)) {
-    if (resolution === 'D') return 730
-    if (resolution === 'W') return 1460
-    if (resolution === 'M') return 3650
-    return 1
-  }
+  if (isNaN(n)) return 1
   if (n <= 5) return 0.03
   if (n <= 15) return 0.07
   if (n <= 30) return 0.3

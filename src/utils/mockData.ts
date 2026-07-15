@@ -19,8 +19,11 @@ function resolutionToSeconds(resolution: string): number {
   const n = Number(resolution)
   if (!isNaN(n) && n > 0) return n
   const map: Record<string, number> = {
+    '1d': 86400,
     D: 86400,
+    '1w': 604800,
     W: 604800,
+    '1M': 2592000,
     M: 2592000,
   }
   return map[resolution] || 3600
