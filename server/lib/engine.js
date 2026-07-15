@@ -28,8 +28,8 @@ export const SYMBOL_MAP = {}
 export const SYMBOL_TYPE = {}
 
 for (const [sym, info] of Object.entries(symbols)) {
-  SYMBOL_MAP[sym] = { binance: info.binance, digits: info.digits }
-  SYMBOL_TYPE[sym] = 'crypto'
+  SYMBOL_MAP[sym] = { binance: info.binance, digits: info.digits, type: info.type }
+  SYMBOL_TYPE[sym] = info.type || 'crypto'
 }
 
 // ── Global State ──
