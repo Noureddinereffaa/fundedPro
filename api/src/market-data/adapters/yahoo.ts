@@ -7,6 +7,14 @@ import {
 import { MarketDataError, ProviderNotConnectedError } from '../errors.js'
 import { logger } from '../../utils/logger.js'
 
+// Infer market type from Yahoo Finance symbol format
+function yahooMarketType(symbol: string): MarketType {
+  if (symbol.startsWith('^')) return MarketType.INDICES
+  if (symbol.endsWith('=X')) return MarketType.FOREX
+  if (symbol.endsWith('=F') || /^(GOLD|SILVER|PLATINUM|PALLADIUM)/i.test(symbol)) return MarketType.METALS
+  return MarketType.STOCKS
+}
+
 export class YahooFinanceProvider implements MarketDataProvider {
   readonly name = ProviderName.YAHOO
   readonly capabilities: ProviderCapabilities
@@ -72,7 +80,7 @@ export class YahooFinanceProvider implements MarketDataProvider {
       quoteVolume: quotes?.volume?.[0] || 0,
       timestamp: Math.floor((result.timestamp?.[0] || Date.now() / 1000)) * 1000,
       provider: this.name,
-      marketType: MarketType.STOCKS,
+      marketType: yahooMarketType(symbol),
     }
   }
 
@@ -134,7 +142,7 @@ export class YahooFinanceProvider implements MarketDataProvider {
       symbol: q.symbol,
       name: q.shortname || q.longname || q.symbol,
       description: `${q.longname || q.shortname || q.symbol} [${q.exchange || ''}]`,
-      marketType: MarketType.STOCKS,
+      marketType: yahooMarketType(q.symbol),
       baseCurrency: q.symbol,
       quoteCurrency: 'USD',
       precision: 2,

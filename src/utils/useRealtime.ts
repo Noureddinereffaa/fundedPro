@@ -270,6 +270,16 @@ export function useRealtimeCandles(
     const isCrypto = symbolInfo?.type === 'crypto'
 
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null
+    let resolveLoading: (() => void) | null = null
+    const loadingPromise = new Promise<void>((resolve) => { resolveLoading = resolve })
+
+    const finishLoading = () => {
+      if (keyRef.current === currentKey) {
+        setIsLoading(false)
+      }
+      resolveLoading?.()
+      resolveLoading = null
+    }
 
     const tryMockFallback = (source: string) => {
       if (keyRef.current !== currentKey || loaded) return
@@ -284,6 +294,7 @@ export function useRealtimeCandles(
         initialRef.current(klines)
       }
       if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null }
+      finishLoading()
     }
 
     const tryRestApiFallback = async () => {
@@ -301,6 +312,7 @@ export function useRealtimeCandles(
           setCachedKlines(sym, int, res.candles)
           initialRef.current(res.candles)
           if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null }
+          finishLoading()
           return true
         }
       } catch (err) {
@@ -312,10 +324,18 @@ export function useRealtimeCandles(
     // For non-crypto symbols, try REST API first
     if (!isCrypto) {
       tryRestApiFallback().then((success) => {
-        if (!success && keyRef.current === currentKey) {
+        if (!success && keyRef.current === currentKey && !loaded) {
           fallbackTimer = setTimeout(() => tryMockFallback('REST API failed'), 3000)
+        } else if (success) {
+          finishLoading()
         }
       })
+      // Fallback timer for REST API timeout
+      setTimeout(() => {
+        if (keyRef.current === currentKey && !loaded) {
+          finishLoading()
+        }
+      }, 10000)
     } else {
       // Crypto: use WS v1
       dataClient.connect().catch(apiErrorHandler('useRealtime'))
@@ -342,25 +362,31 @@ export function useRealtimeCandles(
           tryMockFallback('WS error')
         })
         .finally(() => {
-          if (keyRef.current === currentKey) setIsLoading(false)
+          finishLoading()
         })
     }
 
-    const unsub = dataClient.subscribeCandle(sym, int, (kline) => {
-      if (keyRef.current !== currentKey) return
-      candleRef.current({
-        time: Number(kline.time) || Math.floor(Date.now() / 1000),
-        open: kline.open,
-        high: kline.high,
-        low: kline.low,
-        close: kline.close,
-        volume: kline.volume,
-      })
-    })
+    // Subscribe to real-time candle updates
+    const unsubCandle = isCrypto
+      ? dataClient.subscribeCandle(sym, int, (kline) => {
+          if (keyRef.current !== currentKey) return
+          candleRef.current({
+            time: Number(kline.time) || Math.floor(Date.now() / 1000),
+            open: kline.open,
+            high: kline.high,
+            low: kline.low,
+            close: kline.close,
+            volume: kline.volume,
+          })
+        })
+      : wsV2Client.subscribeCandle(sym, int, (candle) => {
+          if (keyRef.current !== currentKey) return
+          candleRef.current(candle)
+        })
 
     cleanupRef.current = () => {
       if (fallbackTimer) clearTimeout(fallbackTimer)
-      unsub()
+      unsubCandle()
     }
   }, [])
 

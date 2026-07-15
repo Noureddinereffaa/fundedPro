@@ -97,6 +97,7 @@ export class MarketDataService {
 
     return this.withFallback<Ticker>(sym, undefined, async (provider, nativeSymbol) => {
       const ticker = await provider.getTicker(nativeSymbol)
+      ticker.marketType = sym.marketType
       await this.cache.setTicker(sym.id, ticker)
       return ticker
     })
